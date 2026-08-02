@@ -1,0 +1,56 @@
+# ---- General ----
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+Thumbs.db
+
+# ---- Node / Frontend ----
+node_modules/
+dist/
+build/
+.next/
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- Python / Backend / ML ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+*.ipynb_checkpoints
+
+# ---- ML Model Artifacts ----
+ml-service/model/*.pkl
+ml-service/model/*.h5
+ml-service/model/*.joblib
+ml-service/data/raw/
+ml-service/data/*.csv
+
+# ---- Prolog ----
+*.qlf
+
+# ---- RAG / Vector DB ----
+rag-chatbot/knowledge_base/vector_store/
+*.index
+
+# ---- IDE ----
+.vscode/
+.idea/
+*.swp
+
+# ---- Secrets / Credentials ----
+*.pem
+*.key
+credentials.json
+firebase-adminsdk*.json
+twilio_config.json
+
+# ---- OS ----
+.DS_Store
+desktop.ini

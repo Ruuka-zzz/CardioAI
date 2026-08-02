@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  placeholder-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Placeholder step
+        run: echo "Add lint/test steps here as each service (frontend, backend, ml-service, etc.) is scaffolded."
+
+  # Example future jobs (uncomment and configure as each module is built):
+  #
+  # backend-tests:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #     - run: npm install
+  #     - run: npm test
+  #
+  # ml-service-tests:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #     - run: pip install -r ml-service/requirements.txt
+  #     - run: pytest ml-service/

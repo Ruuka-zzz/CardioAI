@@ -1,0 +1,72 @@
+# Scaffold only — fill in build contexts, images, and env once each
+# service has a working Dockerfile. Not yet functional.
+
+version: "3.9"
+
+services:
+  database:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cardioai
+      POSTGRES_USER: cardioai
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ../backend
+    env_file:
+      - ../.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+
+  ml-service:
+    build:
+      context: ../ml-service
+    env_file:
+      - ../.env
+    ports:
+      - "8001:8001"
+
+  prolog-engine:
+    build:
+      context: ../prolog-engine
+    env_file:
+      - ../.env
+    ports:
+      - "8002:8002"
+
+  rag-chatbot:
+    build:
+      context: ../rag-chatbot
+    env_file:
+      - ../.env
+    ports:
+      - "8003:8003"
+
+  notification-service:
+    build:
+      context: ../notification-service
+    env_file:
+      - ../.env
+    ports:
+      - "8004:8004"
+
+  frontend:
+    build:
+      context: ../frontend
+    env_file:
+      - ../.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
