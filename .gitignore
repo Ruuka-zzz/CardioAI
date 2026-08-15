@@ -54,3 +54,7 @@ twilio_config.json
 # ---- OS ----
 .DS_Store
 desktop.ini
+
+# ---- Local database ----
+*.db
+*.sqlite3
