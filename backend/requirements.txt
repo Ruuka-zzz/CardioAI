@@ -1,0 +1,28 @@
+# CardioAI backend — core API only.
+#
+# The AI components are separate containers with their own requirements.txt:
+#   ml-service/ (8001), prolog-engine/ (8002), rag-chatbot/ (8003),
+#   notification-service/ (8004)
+# This service talks to them over HTTP, so scikit-learn, pyswip, and any LLM
+# SDK deliberately do NOT belong here.
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3          # Postgres driver (docker-compose uses postgres:16)
+
+passlib==1.7.4
+pyjwt==2.10.1
+
+httpx==0.28.1                    # calls to ml-service / prolog-engine / etc.
+
+# --- dev & test ---
+pytest==8.3.4
+pytest-asyncio==0.25.0
+respx==0.22.0                    # mocks httpx calls in tests
+ruff==0.8.4

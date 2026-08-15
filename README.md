@@ -95,3 +95,5 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for full contribution guidelines, branc
 ## Disclaimer
 
 CardioAI provides general health monitoring support and educational information. It is **not a diagnostic tool** and does not replace professional medical advice. Users experiencing a medical emergency should contact emergency services immediately.
+
+
