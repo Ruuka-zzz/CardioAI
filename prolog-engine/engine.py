@@ -52,7 +52,7 @@ def check_available() -> None:
 
     try:
         prolog = Prolog()
-        prolog.consult(str(RULEBASE))
+        prolog.consult(RULEBASE.as_posix())
     except Exception as err:  # noqa: BLE001 — pyswip raises bare exceptions
         raise PrologUnavailable(
             "SWI-Prolog could not be loaded. Install it from "
@@ -92,7 +92,7 @@ def run_triage(symptoms: dict[str, int], medication_taken: bool,
 
     with _lock:
         prolog = Prolog()
-        prolog.consult(str(RULEBASE))
+        prolog.consult(RULEBASE.as_posix())
 
         for fact in facts:
             prolog.assertz(fact)
