@@ -1,0 +1,19 @@
+# prolog-engine — daily symptom triage.
+#
+# pyswip is a binding, not an implementation: SWI-Prolog must be installed
+# separately on the host.
+#
+#   Windows : https://www.swi-prolog.org/download/stable  (add to PATH)
+#   macOS   : brew install swi-prolog
+#   Ubuntu  : sudo apt install swi-prolog
+#
+# The Dockerfile installs it for you.
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+
+pyswip==0.3.2
+
+# --- dev & test ---
+pytest==8.3.4

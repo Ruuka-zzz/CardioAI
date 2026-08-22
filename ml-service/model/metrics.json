@@ -1,0 +1,33 @@
+{
+  "trained_at": "2026-08-17T05:35:53.985664",
+  "rows_used": 297,
+  "cv_roc_auc_mean": 0.9058361638361638,
+  "cv_roc_auc_std": 0.05724108991544632,
+  "test_accuracy": 0.8166666666666667,
+  "test_roc_auc": 0.9419642857142857,
+  "confusion_matrix": [
+    [
+      28,
+      4
+    ],
+    [
+      7,
+      21
+    ]
+  ],
+  "feature_order": [
+    "age",
+    "sex",
+    "cp",
+    "trestbps",
+    "chol",
+    "fbs",
+    "restecg",
+    "thalach",
+    "exang",
+    "oldpeak",
+    "slope",
+    "ca",
+    "thal"
+  ]
+}
