@@ -120,4 +120,12 @@ export const api = {
 
   // ---- visitor chatbot (no auth) ----
   ask: (question) => request("/chat", { method: "POST", body: { question }, authed: false }),
+
+  savePushSubscription: (subscription) =>
+    request("/patients/me/push-subscription", { method: "POST", body: subscription }),
+  deletePushSubscription: () =>
+    request("/patients/me/push-subscription", { method: "DELETE" }),
+
 };
+
+  
