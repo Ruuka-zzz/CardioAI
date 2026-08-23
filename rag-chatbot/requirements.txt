@@ -1,0 +1,24 @@
+# rag-chatbot — visitor-facing heart health assistant.
+#
+# Runs with NO API key: embeddings are local (sentence-transformers, CPU) and
+# generation falls back to extractive mode. Add LLM_API_KEY + the anthropic
+# package later to enable synthesised answers.
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+
+# retrieval — local embeddings, no external service
+sentence-transformers==3.3.1
+numpy==2.2.1
+
+# ingestion
+httpx==0.28.1
+beautifulsoup4==4.12.3
+pyyaml==6.0.2
+
+# optional: uncomment when you add an LLM provider
+# anthropic==0.42.0
+
+# --- dev & test ---
+pytest==8.3.4
