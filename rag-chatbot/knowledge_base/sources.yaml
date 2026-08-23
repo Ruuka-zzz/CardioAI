@@ -1,0 +1,114 @@
+# Knowledge base sources for the CardioAI visitor chatbot.
+#
+# LICENSING — read before adding anything here.
+#
+# Every source below is public domain (US federal government works) or
+# openly licensed. That matters because ingest.py stores the text locally and
+# the chatbot reproduces parts of it in answers.
+#
+# The project brief lists the American Heart Association (heart.org). It is
+# NOT included here: AHA content is all-rights-reserved, and scraping it into
+# a vector store for a public GitHub repository is a copyright problem, not a
+# grey area. NHLBI (part of NIH) covers the same clinical ground and is
+# public domain. If your supervisor requires AHA specifically, ask them about
+# permission first — don't just add the URL.
+#
+# Each entry needs `retrieved` filled in when you run ingest.py, for the
+# auditability knowledge_base/README.md asks for.
+
+sources:
+  # ---------------------------------------------------------------
+  # CDC — US Centers for Disease Control. Public domain.
+  # ---------------------------------------------------------------
+  - id: cdc-heart-disease-about
+    url: https://www.cdc.gov/heart-disease/about/index.html
+    publisher: CDC
+    licence: public-domain
+    topics: [what-is-heart-disease, symptoms, types]
+    retrieved: null
+
+  - id: cdc-heart-disease-risk-factors
+    url: https://www.cdc.gov/heart-disease/risk-factors/index.html
+    publisher: CDC
+    licence: public-domain
+    topics: [risk-factors, prevention]
+    retrieved: null
+
+  - id: cdc-heart-disease-prevention
+    url: https://www.cdc.gov/heart-disease/prevention/index.html
+    publisher: CDC
+    licence: public-domain
+    topics: [prevention, lifestyle, diet, exercise]
+    retrieved: null
+
+  - id: cdc-high-blood-pressure
+    url: https://www.cdc.gov/high-blood-pressure/about/index.html
+    publisher: CDC
+    licence: public-domain
+    topics: [hypertension, blood-pressure]
+    retrieved: null
+
+  - id: cdc-cholesterol
+    url: https://www.cdc.gov/cholesterol/about/index.html
+    publisher: CDC
+    licence: public-domain
+    topics: [cholesterol]
+    retrieved: null
+
+  # ---------------------------------------------------------------
+  # WHO — CC BY-NC-SA 3.0 IGO. Attribution required, non-commercial only.
+  # If CardioAI ever becomes commercial, this licence must be revisited.
+  # ---------------------------------------------------------------
+  - id: who-cvd-fact-sheet
+    url: https://www.who.int/news-room/fact-sheets/detail/cardiovascular-diseases-(cvds)
+    publisher: WHO
+    licence: cc-by-nc-sa-3.0-igo
+    topics: [global-burden, risk-factors, prevention]
+    retrieved: null
+
+  # ---------------------------------------------------------------
+  # MedlinePlus — US National Library of Medicine. Public domain,
+  # written specifically at a plain-language reading level.
+  # ---------------------------------------------------------------
+  - id: medlineplus-heart-diseases
+    url: https://medlineplus.gov/heartdiseases.html
+    publisher: MedlinePlus (NIH)
+    licence: public-domain
+    topics: [overview, symptoms]
+    retrieved: null
+
+  - id: medlineplus-heart-failure
+    url: https://medlineplus.gov/heartfailure.html
+    publisher: MedlinePlus (NIH)
+    licence: public-domain
+    topics: [heart-failure, symptoms, management]
+    retrieved: null
+
+  - id: medlineplus-how-to-prevent-heart-disease
+    url: https://medlineplus.gov/howtopreventheartdisease.html
+    publisher: MedlinePlus (NIH)
+    licence: public-domain
+    topics: [prevention, lifestyle]
+    retrieved: null
+
+  # ---------------------------------------------------------------
+  # NHLBI — National Heart, Lung, and Blood Institute (NIH).
+  # Public domain. Substituted for AHA — see the note at the top.
+  # ---------------------------------------------------------------
+  - id: nhlbi-heart-failure
+    url: https://www.nhlbi.nih.gov/health/heart-failure
+    publisher: NHLBI (NIH)
+    licence: public-domain
+    topics: [heart-failure, treatment]
+    retrieved: null
+
+  - id: nhlbi-coronary-heart-disease
+    url: https://www.nhlbi.nih.gov/health/coronary-heart-disease
+    publisher: NHLBI (NIH)
+    licence: public-domain
+    topics: [coronary-artery-disease, symptoms, treatment]
+    retrieved: null
+
+# Platform FAQs. Not scraped — written by the team, so they live in the repo
+# as plain markdown and are ingested alongside the external sources.
+faq_directory: knowledge_base/faq
