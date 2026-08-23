@@ -4,6 +4,9 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./shared/auth/AuthContext";
 import "./shared/styles/glibal.css";
+import { registerServiceWorker } from "./shared/api/push";
+
+registerServiceWorker();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

@@ -199,3 +199,23 @@ def reminders(
                             body="You haven't logged your evening check-in yet."))
 
     return out
+
+@router.post("/me/push-subscription", status_code=200)
+def save_push_subscription(
+    subscription: dict,
+    db: Session = Depends(get_db),
+    patient: Patient = Depends(current_patient),
+):
+    patient.push_subscription = subscription
+    db.commit()
+    return {"subscribed": True}
+
+
+@router.delete("/me/push-subscription", status_code=200)
+def delete_push_subscription(
+    db: Session = Depends(get_db),
+    patient: Patient = Depends(current_patient),
+):
+    patient.push_subscription = None
+    db.commit()
+    return {"subscribed": False}
