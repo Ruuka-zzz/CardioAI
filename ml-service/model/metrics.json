@@ -1,18 +1,18 @@
 {
-  "trained_at": "2026-08-17T05:35:53.985664",
-  "rows_used": 297,
-  "cv_roc_auc_mean": 0.9058361638361638,
-  "cv_roc_auc_std": 0.05724108991544632,
-  "test_accuracy": 0.8166666666666667,
-  "test_roc_auc": 0.9419642857142857,
+  "trained_at": "2026-08-24T14:41:03.349243",
+  "rows_used": 303,
+  "cv_roc_auc_mean": 0.8912745064918978,
+  "cv_roc_auc_std": 0.04051429679983775,
+  "test_accuracy": 0.8688524590163934,
+  "test_roc_auc": 0.9448051948051948,
   "confusion_matrix": [
     [
-      28,
-      4
+      27,
+      6
     ],
     [
-      7,
-      21
+      2,
+      26
     ]
   ],
   "feature_order": [
