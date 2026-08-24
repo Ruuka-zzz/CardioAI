@@ -1,203 +1,119 @@
-import { useEffect, useState } from "react";
-import { TRIAGE_RULE_LABELS } from "@shared/enums";
-import { api } from "../../shared/api/client";
-import Button from "../../shared/components/Button";
-import StatusBand from "../../shared/components/StatusBand";
+import React, { useEffect, useState } from 'react';
+import { api } from '../../shared/api/client';
+import { Users, Calendar, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 
-/**
- * Doctor view: connected patients, appointment requests, and — only where the
- * patient has granted it — the medical record.
- *
- * A 403 on the record fetch is not an error state to apologise for. It's the
- * consent gate working, and the copy says so plainly rather than showing a
- * generic failure that looks like a bug.
- */
 export default function DoctorDashboard() {
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [record, setRecord] = useState(null);
-  const [recordState, setRecordState] = useState("idle");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
-
-    Promise.all([
-      api.doctorPatients().catch(() => []),
-      api.doctorAppointments().catch(() => []),
-    ])
-      .then(([list, appts]) => {
-        if (cancelled) return;
-        setPatients(list ?? []);
-        setAppointments(appts ?? []);
-      })
-      .catch((err) => !cancelled && setError(err.message))
-      .finally(() => !cancelled && setLoading(false));
-
-    return () => {
-      cancelled = true;
-    };
+    async function fetchData() {
+      try {
+        const [pts, appts] = await Promise.all([
+          api.doctorPatients(),
+          api.doctorAppointments()
+        ]);
+        setPatients(pts || []);
+        setAppointments(appts || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
 
-  const openRecord = async (patient) => {
-    setRecordState("loading");
-    setRecord(null);
+  const handleAppointmentAction = async (id, status) => {
     try {
-      setRecord(await api.patientRecord(patient.id));
-      setRecordState("open");
+      await api.respondToAppointment(id, status);
+      setAppointments(appointments.map(a => a.id === id ? { ...a, status } : a));
     } catch (err) {
-      setRecordState(err.status === 403 ? "not-shared" : "error");
-      setError(err.message);
+      alert(err.message);
     }
   };
 
-  const respond = async (appointment, status) => {
-    try {
-      await api.respondToAppointment(appointment.id, status);
-      setAppointments(await api.doctorAppointments());
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  if (loading) return <p className="empty">Loading your patients…</p>;
+  if (loading) {
+    return <div className="min-h-[calc(100vh-4rem)] bg-slate-950 flex items-center justify-center text-slate-500 text-xs">Loading Clinical Data...</div>;
+  }
 
   return (
-    <section>
-      <h1>Your patients</h1>
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-950 text-slate-100 p-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Clinical Workstation</h2>
+          <p className="text-xs text-slate-400 mt-1">Patient monitoring and appointment dispatch management</p>
+        </div>
 
-      {error && recordState !== "not-shared" && (
-        <p className="alert" role="alert">
-          {error}
-        </p>
-      )}
+        {/* Patients Grid */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+          <div className="flex items-center gap-2 mb-6">
+            <Users className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-base font-bold text-white">Active Assigned Patients</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                  <th className="p-4">Patient ID</th>
+                  <th className="p-4">Name</th>
+                  <th className="p-4">Monitoring Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-xs">
+                {patients.length === 0 ? (
+                  <tr><td colSpan="3" className="p-6 text-center text-slate-500">No active patients currently assigned.</td></tr>
+                ) : (
+                  patients.map((p) => (
+                    <tr key={p.id} className="hover:bg-slate-800/30 transition-all">
+                      <td className="p-4 font-mono font-bold text-emerald-400">{p.id}</td>
+                      <td className="p-4 text-slate-200 font-semibold">{p.name || 'Patient'}</td>
+                      <td className="p-4">
+                        <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-full">
+                          Continuous Tracking
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-      {appointments.length > 0 && (
-        <>
-          <h2>Appointment requests</h2>
-          <ul className="stack">
-            {appointments
-              .filter((a) => a.status === "requested")
-              .map((appointment) => (
-                <li className="card" key={appointment.id} style={{ marginBottom: 0 }}>
-                  <p className="readout" style={{ marginBottom: "0.5rem" }}>
-                    {formatSlot(appointment.starts_at)}
-                  </p>
-                  <p>{appointment.patient_name ?? "Patient"}</p>
-                  {appointment.reason && <p className="lede">{appointment.reason}</p>}
-                  <div className="row">
-                    <Button onClick={() => respond(appointment, "confirmed")}>
-                      Confirm
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => respond(appointment, "declined")}
-                    >
-                      Decline
-                    </Button>
+        {/* Appointments Section */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+          <div className="flex items-center gap-2 mb-6">
+            <Calendar className="w-5 h-5 text-teal-400" />
+            <h3 className="text-base font-bold text-white">Consultation Requests</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {appointments.length === 0 ? (
+              <p className="text-slate-500 text-xs col-span-2">No pending consultation requests.</p>
+            ) : (
+              appointments.map((appt) => (
+                <div key={appt.id} className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Request #{appt.id}</span>
+                    <h4 className="text-xs font-bold text-slate-200 mt-1">Status: <span className="text-emerald-400 uppercase">{appt.status}</span></h4>
                   </div>
-                </li>
-              ))}
-          </ul>
-        </>
-      )}
-
-      <h2>Connected patients</h2>
-      {patients.length === 0 ? (
-        <p className="empty">
-          No patients have connected with you yet. They'll appear here once they
-          book an appointment.
-        </p>
-      ) : (
-        <ul className="stack">
-          {patients.map((patient) => (
-            <li className="card" key={patient.id} style={{ marginBottom: 0 }}>
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <h3 style={{ margin: 0 }}>{patient.full_name}</h3>
-                <span className={patient.record_shared ? "pill pill--on" : "pill pill--off"}>
-                  {patient.record_shared ? "Record shared" : "Record private"}
-                </span>
-              </div>
-              <div className="row" style={{ marginTop: "0.75rem" }}>
-                <Button
-                  variant="secondary"
-                  onClick={() => openRecord(patient)}
-                  disabled={!patient.record_shared}
-                >
-                  Open record
-                </Button>
-              </div>
-              {!patient.record_shared && (
-                <p className="lede" style={{ margin: "0.5rem 0 0", fontSize: "0.875rem" }}>
-                  This patient hasn't shared their history with you.
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {recordState === "loading" && <p className="empty">Opening record…</p>}
-
-      {recordState === "not-shared" && (
-        <div className="card card--sunk">
-          <h2>Record not shared</h2>
-          <p style={{ marginBottom: 0 }}>
-            This patient hasn't given you access to their medical record. Only
-            they can grant it, from their doctors page.
-          </p>
+                  {appt.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <button onClick={() => handleAppointmentAction(appt.id, 'confirmed')} className="p-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl font-bold text-xs">
+                        <CheckCircle className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleAppointmentAction(appt.id, 'rejected')} className="p-2 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-xl font-bold text-xs">
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      )}
-
-      {recordState === "open" && record && (
-        <div className="card">
-          <p className="eyebrow">Medical record · access logged</p>
-          <h2>{record.full_name}</h2>
-          <p className="lede">
-            Baseline risk: <span className="readout">{record.baseline_risk ?? "not set"}</span>
-          </p>
-
-          {(record.recent_checkins ?? []).length > 0 && (
-            <>
-              <h3>Recent check-ins</h3>
-              <ul className="stack">
-                {record.recent_checkins.map((c, i) => (
-                  <li key={`${c.date}-${c.slot}-${i}`}>
-                    <StatusBand
-                      status={c.status}
-                      score={c.score ?? 0}
-                      label={`${c.date} · ${c.slot}`}
-                    />
-                    {(c.fired_rules ?? []).length > 0 && (
-                      <ol className="trail">
-                        {c.fired_rules.map((rule) => (
-                          <li key={rule}>{TRIAGE_RULE_LABELS[rule] ?? rule}</li>
-                        ))}
-                      </ol>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          <Button variant="quiet" onClick={() => setRecordState("idle")}>
-            Close record
-          </Button>
-        </div>
-      )}
-    </section>
+      </div>
+    </div>
   );
-}
-
-function formatSlot(iso) {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }

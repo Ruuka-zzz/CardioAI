@@ -1,81 +1,128 @@
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { homeFor, useAuth } from "../auth/AuthContext";
-import Button from "./Button";
-import FormInput from "./FormInput";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 
-/** Sign in. One form for all three roles — the backend decides where you land. */
 export default function Login() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  
+  const navigate = useNavigate();
+  const auth = useAuth();
 
-  const set = (field) => (value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError("");
-  };
 
-  const submit = async (event) => {
-    event.preventDefault();
-
-    if (!form.email.trim() || !form.password) {
-      setError("Enter your email and password.");
-      return;
-    }
-
-    setBusy(true);
     try {
-      const res = await login(form);
-      navigate(location.state?.from ?? homeFor(res.role), { replace: true });
+      if (auth?.login) {
+        
+        await auth.login({ email, password });
+      }
+      navigate("/");
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
+      setError(err.message || "Failed to sign in");
     }
   };
 
   return (
-    <section>
-      <h1>Sign in</h1>
-      <p className="lede">Welcome back. Your check-in takes about a minute.</p>
-
-      <form onSubmit={submit} noValidate>
-        <FormInput
-          label="Email"
-          type="email"
-          autoComplete="email"
-          value={form.email}
-          onChange={set("email")}
-        />
-        <FormInput
-          label="Password"
-          type="password"
-          autoComplete="current-password"
-          value={form.password}
-          onChange={set("password")}
-        />
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#0f172a",
+      padding: "20px"
+    }}>
+      <div style={{
+        width: "100%",
+        maxWidth: "400px",
+        backgroundColor: "#1e293b",
+        padding: "32px",
+        borderRadius: "12px",
+        boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+        color: "#f8fafc"
+      }}>
+        <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "8px" }}>Sign in</h2>
+        <p style={{ color: "#94a3b8", fontSize: "14px", marginBottom: "24px" }}>
+          Welcome back. Your check-in takes about a minute.
+        </p>
 
         {error && (
-          <p className="alert" role="alert">
+          <div style={{ color: "#ef4444", fontSize: "14px", marginBottom: "16px" }}>
             {error}
-          </p>
+          </div>
         )}
 
-        <Button type="submit" block busy={busy} busyLabel="Signing in…">
-          Sign in
-        </Button>
-      </form>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "14px", color: "#cbd5e1", marginBottom: "6px" }}>
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "6px",
+                border: "1px solid #334155",
+                backgroundColor: "#0f172a",
+                color: "#fff",
+                boxSizing: "border-box"
+              }}
+            />
+          </div>
 
-      <p className="lede" style={{ marginTop: "1.5rem" }}>
-        New here? <Link to="/signup">Create a patient account</Link>.
-      </p>
-      <p className="lede">
-        Doctors joining CardioAI: <Link to="/signup?doctor=1">use your activation code</Link>.
-      </p>
-    </section>
+          <div style={{ marginBottom: "24px" }}>
+            <label style={{ display: "block", fontSize: "14px", color: "#cbd5e1", marginBottom: "6px" }}>
+              Password
+            </label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "6px",
+                border: "1px solid #334155",
+                backgroundColor: "#0f172a",
+                color: "#fff",
+                boxSizing: "border-box"
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            style={{
+              width: "100%",
+              padding: "12px",
+              backgroundColor: "#10b981",
+              color: "#090d16",
+              border: "none",
+              borderRadius: "6px",
+              fontWeight: "600",
+              cursor: "pointer"
+            }}
+          >
+            Sign in
+          </button>
+        </form>
+
+        <div style={{ marginTop: "24px", fontSize: "14px", color: "#94a3b8" }}>
+          <p style={{ marginBottom: "8px" }}>
+            New here? <Link to="/signup" style={{ color: "#2dd4bf" }}>Create a patient account.</Link>
+          </p>
+          <p>
+            Doctors joining CardioAI: use your activation code.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }

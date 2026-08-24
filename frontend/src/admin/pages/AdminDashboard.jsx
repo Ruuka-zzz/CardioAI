@@ -1,166 +1,91 @@
-import { useEffect, useState } from "react";
-import { api } from "../../shared/api/client";
-import Button from "../../shared/components/Button";
-import FormInput from "../../shared/components/FormInput";
+import React, { useEffect, useState } from 'react';
+import { api } from '../../shared/api/client';
+import { Shield, Key, FileText, Check } from 'lucide-react';
 
-/**
- * Admin: issue doctor activation codes, manage doctor accounts, read the
- * audit log.
- *
- * No AI anywhere in this view by design — it's account administration.
- *
- * The generated code is shown once, immediately after issuing, because the
- * admin has to pass it to the doctor out of band. If it's lost, issue a new
- * one rather than trying to recover it.
- */
 export default function AdminDashboard() {
-  const [doctors, setDoctors] = useState([]);
-  const [audit, setAudit] = useState([]);
-  const [form, setForm] = useState({ full_name: "", specialty: "", bio: "" });
-  const [issued, setIssued] = useState(null);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [logs, setLogs] = useState([]);
+  const [email, setEmail] = useState('');
+  const [issuedCode, setIssuedCode] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
-
-    Promise.all([
-      api.adminDoctors().catch(() => []),
-      api.auditLog().catch(() => []),
-    ])
-      .then(([list, log]) => {
-        if (cancelled) return;
-        setDoctors(list ?? []);
-        setAudit(log ?? []);
-      })
-      .finally(() => !cancelled && setLoading(false));
-
-    return () => {
-      cancelled = true;
-    };
+    async function fetchData() {
+      try {
+        const auditLogs = await api.auditLog();
+        setLogs(auditLogs || []);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    fetchData();
   }, []);
 
-  const set = (field) => (value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setError("");
-  };
-
-  const issue = async (event) => {
-    event.preventDefault();
-
-    if (!form.full_name.trim() || !form.specialty.trim()) {
-      setError("Enter the doctor's name and specialty.");
-      return;
-    }
-
-    setBusy(true);
+  const handleIssueCode = async (e) => {
+    e.preventDefault();
     try {
-      const created = await api.issueDoctorCode({
-        full_name: form.full_name.trim(),
-        specialty: form.specialty.trim(),
-        bio: form.bio.trim() || null,
-      });
-      setIssued(created);
-      setForm({ full_name: "", specialty: "", bio: "" });
-      setDoctors(await api.adminDoctors());
+      const res = await api.issueDoctorCode({ email });
+      setIssuedCode(res?.code || 'SUCCESS');
+      setEmail('');
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
+      alert(err.message);
     }
   };
-
-  const revoke = async (doctor) => {
-    try {
-      await api.revokeDoctor(doctor.id);
-      setDoctors(await api.adminDoctors());
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  if (loading) return <p className="empty">Loading…</p>;
 
   return (
-    <section>
-      <h1>Doctor accounts</h1>
-
-      {issued && (
-        <div className="card">
-          <p className="eyebrow">Activation code · shown once</p>
-          <p className="readout" style={{ fontSize: "1.375rem", letterSpacing: "0.08em" }}>
-            {issued.activation_code}
-          </p>
-          <p style={{ marginBottom: 0 }}>
-            Send this to {issued.full_name}. It can't be retrieved later — issue
-            a new one if it's lost.
-          </p>
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-950 text-slate-100 p-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold text-white">System Administration</h2>
+          <p className="text-xs text-slate-400 mt-1">Provider activation, access control & security audit logging</p>
         </div>
-      )}
 
-      <form onSubmit={issue} className="card" noValidate>
-        <h2>Issue a new code</h2>
-        <FormInput label="Doctor's name" value={form.full_name} onChange={set("full_name")} />
-        <FormInput label="Specialty" value={form.specialty} onChange={set("specialty")} />
-        <FormInput
-          label="Short bio"
-          hint="Shown on their public profile. Optional."
-          value={form.bio}
-          onChange={set("bio")}
-        />
+        {/* Issue Code Block */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center gap-2">
+            <Key className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-base font-bold text-white">Issue Clinician Activation Key</h3>
+          </div>
+          <form onSubmit={handleIssueCode} className="flex gap-3">
+            <input
+              type="email"
+              placeholder="Doctor's Professional Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+            />
+            <button type="submit" className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl hover:from-emerald-400 hover:to-teal-300 transition-all">
+              Generate Key
+            </button>
+          </form>
 
-        {error && (
-          <p className="alert" role="alert">
-            {error}
-          </p>
-        )}
+          {issuedCode && (
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
+              <span className="text-xs text-slate-300">Activation Code Generated:</span>
+              <span className="font-mono text-emerald-400 font-bold text-sm tracking-wider">{issuedCode}</span>
+            </div>
+          )}
+        </div>
 
-        <Button type="submit" busy={busy} busyLabel="Issuing…">
-          Issue activation code
-        </Button>
-      </form>
-
-      <h2>Doctors on the platform</h2>
-      {doctors.length === 0 ? (
-        <p className="empty">No doctors yet. Issue a code to get started.</p>
-      ) : (
-        <ul className="stack">
-          {doctors.map((doctor) => (
-            <li className="card" key={doctor.id} style={{ marginBottom: 0 }}>
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <div>
-                  <h3 style={{ margin: 0 }}>{doctor.full_name}</h3>
-                  <p className="lede" style={{ margin: 0 }}>
-                    {doctor.specialty}
-                  </p>
+        {/* Audit Log Table */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+          <div className="flex items-center gap-2 mb-6">
+            <FileText className="w-5 h-5 text-teal-400" />
+            <h3 className="text-base font-bold text-white">System Security Audit Log</h3>
+          </div>
+          <div className="space-y-2">
+            {logs.length === 0 ? (
+              <p className="text-slate-500 text-xs">No recorded system audit logs.</p>
+            ) : (
+              logs.map((log, idx) => (
+                <div key={idx} className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs flex justify-between items-center">
+                  <span className="font-semibold text-slate-300">{log.action || 'Access Event'}</span>
+                  <span className="text-[10px] text-slate-500 font-mono">{log.timestamp || 'Recorded'}</span>
                 </div>
-                <span className={doctor.activated ? "pill pill--on" : "pill pill--off"}>
-                  {doctor.activated ? "Active" : "Code unused"}
-                </span>
-              </div>
-              <Button variant="quiet" onClick={() => revoke(doctor)}>
-                Remove from platform
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <h2>Record access log</h2>
-      {audit.length === 0 ? (
-        <p className="empty">No record accesses logged yet.</p>
-      ) : (
-        <ul className="stack">
-          {audit.slice(0, 25).map((entry) => (
-            <li key={entry.id} className="readout" style={{ fontSize: "0.8125rem" }}>
-              {new Date(entry.occurred_at).toLocaleString()} · {entry.actor_name ?? entry.actor_user_id}{" "}
-              · {entry.action}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

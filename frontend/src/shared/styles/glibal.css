@@ -12,6 +12,11 @@
  * repo. Rename to global.css when convenient and update main.jsx.
  */
 
+  @tailwind base;
+  @tailwind components;
+  @tailwind utilities;
+
+
 :root {
   --paper: #eff3f2;
   --surface: #ffffff;
