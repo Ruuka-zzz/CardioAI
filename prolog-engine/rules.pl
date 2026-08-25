@@ -70,7 +70,7 @@ rule(fair, elevated,
 rule(fair, routine,
      'Mild symptoms today. Keep monitoring and log again tomorrow.',
      mild_symptoms) :-
-    symptom(_, S), S >= 1.
+    once((symptom(_, S), S >= 1)).
 
 rule(fair, routine,
      'You missed a dose today. Take it as soon as you can unless your doctor said otherwise.',
