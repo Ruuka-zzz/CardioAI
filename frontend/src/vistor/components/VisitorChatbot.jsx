@@ -44,9 +44,9 @@ export default function VisitorChatbot() {
       <p className="eyebrow">Heart health questions</p>
       <h2>Ask anything general</h2>
       <p className="lede">
-        General information only, drawn from the CDC, the American Heart
-        Association, the WHO and MedlinePlus. This assistant can't look at your
-        symptoms or tell you whether you have a condition.
+        General information only, drawn from the CDC, the WHO, MedlinePlus and the
+NHLBI. This assistant can't look at your symptoms or tell you whether you
+have a condition.
       </p>
 
       {turns.length > 0 && (
