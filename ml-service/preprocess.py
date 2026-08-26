@@ -54,6 +54,15 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     # presence/absence, so anything above 0 counts as disease present.
     if df[TARGET].max() > 1:
         df[TARGET] = (df[TARGET] > 0).astype(int)
+            # Force numeric dtypes. If the CSV came from a source that used "?" for
+    # missing values, pandas reads those columns as object — and an encoder
+    # fitted on object categories cannot match the numbers the API sends.
+    for column in FEATURE_ORDER + [TARGET]:
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+    df = df.dropna(subset=FEATURE_ORDER + [TARGET])
+
+    integers = [c for c in FEATURE_ORDER + [TARGET] if c != "oldpeak"]
+    df[integers] = df[integers].astype(int)
 
     return df.reset_index(drop=True)
 
