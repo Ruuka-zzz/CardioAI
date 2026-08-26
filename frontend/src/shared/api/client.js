@@ -126,6 +126,15 @@ export const api = {
   deletePushSubscription: () =>
     request("/patients/me/push-subscription", { method: "DELETE" }),
 
+    // ---- doctor schedule ----
+  myWorkingHours: () => request("/doctor/availability"),
+  addWorkingHours: (data) =>
+    request("/doctor/availability", { method: "POST", body: data }),
+  removeWorkingHours: (id) =>
+    request(`/doctor/availability/${id}`, { method: "DELETE" }),
+  myCalendar: () => request("/doctor/calendar"),
+
+
 };
 
   
