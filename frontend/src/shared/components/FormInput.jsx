@@ -1,13 +1,5 @@
 import { useId } from "react";
 
-/**
- * Labelled form control. Renders an input, a select (pass `options`), or a
- * checkbox (`type="checkbox"`).
- *
- * The error is wired to the control with aria-describedby and aria-invalid
- * rather than just being coloured text, so screen reader users hear why the
- * form was rejected instead of only seeing red.
- */
 export default function FormInput({
   label,
   hint,
@@ -28,41 +20,57 @@ export default function FormInput({
 
   if (type === "checkbox") {
     return (
-      <>
-        <label className="checkbox" htmlFor={id}>
+      <div style={{ marginBottom: "16px" }}>
+        <label 
+          htmlFor={id} 
+          style={{ 
+            display: "flex", 
+            alignItems: "flex-start", 
+            gap: "12px", 
+            cursor: "pointer" 
+          }}
+        >
           <input
             id={id}
             type="checkbox"
             checked={Boolean(value)}
             onChange={(e) => onChange(e.target.checked)}
             aria-describedby={describedBy}
+            style={{ 
+              width: "20px", 
+              height: "20px", 
+              accentColor: "#38bdf8", 
+              cursor: "pointer",
+              marginTop: "2px",
+              flexShrink: 0
+            }}
             {...rest}
           />
-          <span>
+          <span style={{ color: "#ffffff", fontSize: "14px", fontWeight: "500", lineHeight: "1.4" }}>
             {label}
             {hint && (
-              <span className="field__hint" id={hintId}>
+              <span id={hintId} style={{ display: "block", color: "#94a3b8", fontSize: "12px", marginTop: "2px", fontWeight: "normal" }}>
                 {hint}
               </span>
             )}
           </span>
         </label>
         {error && (
-          <span className="field__error" id={errorId} role="alert">
+          <span id={errorId} role="alert" style={{ color: "#ef4444", fontSize: "12px", marginTop: "4px", display: "block", marginLeft: "32px" }}>
             {error}
           </span>
         )}
-      </>
+      </div>
     );
   }
 
   return (
-    <div className="field">
-      <label className="field__label" htmlFor={id}>
+    <div style={{ marginBottom: "16px" }}>
+      <label htmlFor={id} style={{ display: "block", color: "#cbd5e1", fontSize: "14px", fontWeight: "500", marginBottom: "6px" }}>
         {label}
       </label>
       {hint && (
-        <span className="field__hint" id={hintId}>
+        <span id={hintId} style={{ display: "block", color: "#94a3b8", fontSize: "12px", marginBottom: "6px" }}>
           {hint}
         </span>
       )}
@@ -70,11 +78,20 @@ export default function FormInput({
       {options ? (
         <select
           id={id}
-          className="field__control"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={error ? "true" : undefined}
           aria-describedby={describedBy}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: "6px",
+            border: "1px solid #334155",
+            backgroundColor: "#ffffff",
+            color: "#0f172a",
+            fontSize: "14px",
+            boxSizing: "border-box"
+          }}
           {...rest}
         >
           {options.map((opt) => (
@@ -87,17 +104,26 @@ export default function FormInput({
         <input
           id={id}
           type={type}
-          className="field__control"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={error ? "true" : undefined}
           aria-describedby={describedBy}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: "6px",
+            border: "1px solid #334155",
+            backgroundColor: "#ffffff",
+            color: "#0f172a",
+            fontSize: "14px",
+            boxSizing: "border-box"
+          }}
           {...rest}
         />
       )}
 
       {error && (
-        <span className="field__error" id={errorId} role="alert">
+        <span id={errorId} role="alert" style={{ color: "#ef4444", fontSize: "12px", marginTop: "4px", display: "block" }}>
           {error}
         </span>
       )}

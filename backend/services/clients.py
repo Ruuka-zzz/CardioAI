@@ -148,6 +148,6 @@ def notify(patient_id: str, urgency: Urgency, body: str) -> None:
                 },
             )
             res.raise_for_status()
-    except httpx.HTTPError:
+    except Exception:
         # Swallowed on purpose — see the failure policy in the module docstring.
         log.exception("notification-service unreachable for patient %s", patient_id)

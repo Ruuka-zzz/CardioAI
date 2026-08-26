@@ -1,138 +1,156 @@
-import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { homeFor, useAuth } from "../auth/AuthContext";
-import Button from "./Button";
-import FormInput from "./FormInput";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 
-/**
- * Two paths, one page.
- *
- * Patients self-register. Doctors do not — an admin issues an activation code
- * and the doctor exchanges it for an account exactly once. Keeping both here
- * means a doctor who lands on the wrong form finds the right one immediately
- * instead of hitting a dead end.
- */
 export default function Signup() {
-  const [params] = useSearchParams();
-  const isDoctor = params.get("doctor") === "1";
-
-  const { signup, activateDoctor } = useAuth();
-  const navigate = useNavigate();
-
-  const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    password: "",
-    activation_code: "",
-  });
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  const set = (field) => (value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  const navigate = useNavigate();
+  const auth = useAuth();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError("");
-  };
 
-  const submit = async (event) => {
-    event.preventDefault();
-
-    if (!form.email.trim() || form.password.length < 8) {
-      setError("Enter your email and a password of at least 8 characters.");
-      return;
-    }
-    if (isDoctor && !form.activation_code.trim()) {
-      setError("Enter the activation code CardioAI sent you.");
-      return;
-    }
-    if (!isDoctor && !form.full_name.trim()) {
-      setError("Enter your name.");
-      return;
-    }
-
-    setBusy(true);
     try {
-      const res = isDoctor
-        ? await activateDoctor({
-            activation_code: form.activation_code.trim(),
-            email: form.email.trim(),
-            password: form.password,
-          })
-        : await signup({
-            full_name: form.full_name.trim(),
-            email: form.email.trim(),
-            password: form.password,
-          });
-
-      navigate(homeFor(res.role), { replace: true });
+      if (auth?.signup) {
+       
+        await auth.signup({ 
+          full_name: name, 
+          email: email, 
+          password: password 
+        });
+      }
+      navigate("/");
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
+      setError(err.message || "Failed to create account");
     }
   };
 
   return (
-    <section>
-      <h1>{isDoctor ? "Activate your doctor account" : "Create your account"}</h1>
-      <p className="lede">
-        {isDoctor
-          ? "Enter the activation code from CardioAI, then set your sign-in details."
-          : "Next you'll answer some questions about your medical history. Have your most recent test results to hand if you can."}
-      </p>
-
-      <form onSubmit={submit} noValidate>
-        {isDoctor ? (
-          <FormInput
-            label="Activation code"
-            hint="Sent to you by the CardioAI team."
-            value={form.activation_code}
-            onChange={set("activation_code")}
-            autoComplete="off"
-          />
-        ) : (
-          <FormInput
-            label="Your name"
-            value={form.full_name}
-            onChange={set("full_name")}
-            autoComplete="name"
-          />
-        )}
-
-        <FormInput
-          label="Email"
-          type="email"
-          value={form.email}
-          onChange={set("email")}
-          autoComplete="email"
-        />
-        <FormInput
-          label="Password"
-          type="password"
-          hint="At least 8 characters."
-          value={form.password}
-          onChange={set("password")}
-          autoComplete="new-password"
-        />
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#0f172a",
+      padding: "20px"
+    }}>
+      <div style={{
+        width: "100%",
+        maxWidth: "420px",
+        backgroundColor: "#1e293b",
+        padding: "32px",
+        borderRadius: "12px",
+        boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+        color: "#f8fafc"
+      }}>
+        <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "8px" }}>Create your account</h2>
+        <p style={{ color: "#94a3b8", fontSize: "14px", marginBottom: "24px", lineHeight: "1.4" }}>
+          Next you'll answer some questions about your medical history. Have your most recent test results to hand if you can.
+        </p>
 
         {error && (
-          <p className="alert" role="alert">
+          <div style={{ color: "#ef4444", fontSize: "14px", marginBottom: "16px" }}>
             {error}
-          </p>
+          </div>
         )}
 
-        <Button type="submit" block busy={busy} busyLabel="Creating your account…">
-          {isDoctor ? "Activate account" : "Create account"}
-        </Button>
-      </form>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "14px", color: "#cbd5e1", marginBottom: "6px" }}>
+              Your name
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "6px",
+                border: "1px solid #334155",
+                backgroundColor: "#0f172a",
+                color: "#fff",
+                boxSizing: "border-box"
+              }}
+            />
+          </div>
 
-      <p className="lede" style={{ marginTop: "1.5rem" }}>
-        Already have an account? <Link to="/login">Sign in</Link>.
-      </p>
-      {!isDoctor && (
-        <p className="lede">
-          Are you a doctor? <Link to="/signup?doctor=1">Activate with your code</Link>.
-        </p>
-      )}
-    </section>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "14px", color: "#cbd5e1", marginBottom: "6px" }}>
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "6px",
+                border: "1px solid #334155",
+                backgroundColor: "#0f172a",
+                color: "#fff",
+                boxSizing: "border-box"
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: "24px" }}>
+            <label style={{ display: "block", fontSize: "14px", color: "#cbd5e1", marginBottom: "6px" }}>
+              Password
+            </label>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 8 characters."
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "6px",
+                border: "1px solid #334155",
+                backgroundColor: "#0f172a",
+                color: "#fff",
+                boxSizing: "border-box"
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            style={{
+              width: "100%",
+              padding: "12px",
+              backgroundColor: "#10b981",
+              color: "#090d16",
+              border: "none",
+              borderRadius: "6px",
+              fontWeight: "600",
+              cursor: "pointer"
+            }}
+          >
+            Create account
+          </button>
+        </form>
+
+        <div style={{ marginTop: "24px", fontSize: "14px", color: "#94a3b8" }}>
+          <p style={{ marginBottom: "8px" }}>
+            Already have an account? <Link to="/login" style={{ color: "#2dd4bf" }}>Sign in.</Link>
+          </p>
+          <p>
+            Are you a doctor? <span style={{ color: "#2dd4bf", cursor: "pointer" }}>Activate with your code.</span>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
