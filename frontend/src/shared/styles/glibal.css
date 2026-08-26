@@ -1,18 +1,17 @@
-/* CardioAI design tokens and base styles.
- *
- * Direction: a patient's paper logbook crossed with a monitor readout.
- * Warm-neutral paper ground, ink text, one deep teal for anything the user
- * can act on. Red / amber / green appear ONLY as condition status — never as
- * decoration — so colour always means the same thing.
- *
- * Numbers (scores, times, percentages) are set in mono. They are readouts,
- * not prose, and the tabular figures keep them from jittering as they change.
- *
- * NOTE: filename is "glibal.css" to match the path already committed to the
- * repo. Rename to global.css when convenient and update main.jsx.
- */
+/* =========================================================
+   CardioAI – Global Styles
+   =========================================================
+   Design direction:
+   - Dark clinical UI (slate-950 / slate-900) for dashboards
+   - Light “paper logbook” tokens kept for StatusBand / older pages
+   - One accent (teal/emerald) for actions
+   - Red / amber / green ONLY for status (good / fair / bad)
+   ========================================================= */
 
+@import "tailwindcss";
+/* ---------- Design tokens ---------- */
 :root {
+  /* Light / paper theme (used by StatusBand + older shell) */
   --paper: #eff3f2;
   --surface: #ffffff;
   --surface-sunk: #f6f8f8;
@@ -33,10 +32,21 @@
   --bad: #a3231c;
   --bad-soft: #f8e4e2;
 
+  /* Dark theme overrides (most current pages) */
+  --bg-dark: #0f172a;          /* slate-950 */
+  --surface-dark: #1e293b;     /* slate-900 */
+  --border-dark: #334155;      /* slate-700 */
+  --text-dark: #f8fafc;
+  --text-muted-dark: #94a3b8;
+  --accent-dark: #10b981;      /* emerald-500 */
+  --accent-dark-hover: #34d399;
+
+  /* Typography */
   --font-display: "Archivo", system-ui, sans-serif;
   --font-body: "Public Sans", system-ui, sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, monospace;
 
+  /* Spacing scale */
   --step-1: 0.25rem;
   --step-2: 0.5rem;
   --step-3: 0.75rem;
@@ -47,9 +57,12 @@
 
   --radius: 6px;
   --radius-lg: 10px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
   --measure: 34rem;
 }
 
+/* ---------- Reset & base ---------- */
 *,
 *::before,
 *::after {
@@ -60,19 +73,26 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
-body {
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100vh;
   margin: 0;
-  background: var(--paper);
-  color: var(--ink);
+  padding: 0;
+  background-color: var(--bg-dark);
+  color: var(--text-dark);
+  overflow-x: hidden;
+}
+
+body {
   font-family: var(--font-body);
   font-size: 1rem;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
-h1,
-h2,
-h3 {
+h1, h2, h3 {
   font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -81,33 +101,24 @@ h3 {
   text-wrap: balance;
 }
 
-h1 {
-  font-size: 1.625rem;
-}
-h2 {
-  font-size: 1.25rem;
-}
-h3 {
-  font-size: 1rem;
-}
+h1 { font-size: 1.625rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1rem; }
 
-p {
-  margin: 0 0 var(--step-4);
-}
+p { margin: 0 0 var(--step-4); }
 
 a {
-  color: var(--accent);
+  color: var(--accent-dark);
   text-underline-offset: 3px;
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-dark);
   outline-offset: 2px;
   border-radius: 3px;
 }
 
-/* ---------- layout ---------- */
-
+/* ---------- Layout helpers ---------- */
 .shell {
   min-height: 100vh;
   display: flex;
@@ -115,8 +126,8 @@ a {
 }
 
 .shell__bar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--rule);
+  background: var(--surface-dark);
+  border-bottom: 1px solid var(--border-dark);
   padding: var(--step-3) var(--step-4);
 }
 
@@ -137,8 +148,8 @@ a {
 }
 
 .shell__nav {
-  background: var(--surface);
-  border-top: 1px solid var(--rule);
+  background: var(--surface-dark);
+  border-top: 1px solid var(--border-dark);
   position: sticky;
   bottom: 0;
 }
@@ -157,23 +168,20 @@ a {
   text-align: center;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--muted);
+  color: var(--text-muted-dark);
   text-decoration: none;
   border-top: 2px solid transparent;
   margin-top: -1px;
 }
 
-.shell__nav li {
-  flex: 1;
-}
+.shell__nav li { flex: 1; }
 
 .shell__nav a[aria-current="page"] {
-  color: var(--accent);
-  border-top-color: var(--accent);
+  color: var(--accent-dark);
+  border-top-color: var(--accent-dark);
 }
 
-/* ---------- wordmark ---------- */
-
+/* ---------- Wordmark ---------- */
 .wordmark {
   display: flex;
   align-items: center;
@@ -182,28 +190,28 @@ a {
   font-weight: 600;
   font-size: 1.0625rem;
   letter-spacing: -0.02em;
-  color: var(--ink);
+  color: var(--text-dark);
   text-decoration: none;
   margin-right: auto;
 }
 
 .wordmark svg {
   display: block;
-  color: var(--accent);
+  color: var(--accent-dark);
 }
 
-/* ---------- cards ---------- */
-
+/* ---------- Cards ---------- */
 .card {
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-lg);
+  background: var(--surface-dark);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-xl);
   padding: var(--step-5);
   margin-bottom: var(--step-4);
+  color: var(--text-dark);
 }
 
 .card--sunk {
-  background: var(--surface-sunk);
+  background: #0f172a;
   border-style: dashed;
 }
 
@@ -213,12 +221,12 @@ a {
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--faint);
+  color: var(--text-muted-dark);
   margin: 0 0 var(--step-2);
 }
 
 .lede {
-  color: var(--muted);
+  color: var(--text-muted-dark);
 }
 
 .readout {
@@ -226,8 +234,7 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- forms ---------- */
-
+/* ---------- Forms ---------- */
 .field {
   margin-bottom: var(--step-4);
 }
@@ -237,42 +244,43 @@ a {
   font-weight: 500;
   font-size: 0.9375rem;
   margin-bottom: var(--step-1);
+  color: #cbd5e1;
 }
 
 .field__hint {
   display: block;
   font-size: 0.8125rem;
-  color: var(--muted);
+  color: var(--text-muted-dark);
   margin-bottom: var(--step-2);
 }
 
 .field__control {
   width: 100%;
   font: inherit;
-  color: inherit;
-  background: var(--surface);
-  border: 1px solid var(--rule-strong);
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid var(--border-dark);
   border-radius: var(--radius);
   padding: 0.625rem 0.75rem;
   min-height: 2.75rem;
 }
 
 .field__control:focus-visible {
-  border-color: var(--accent);
+  border-color: var(--accent-dark);
 }
 
 .field__control[aria-invalid="true"] {
-  border-color: var(--bad);
+  border-color: #ef4444;
 }
 
 .field__error {
   display: block;
   font-size: 0.8125rem;
-  color: var(--bad);
+  color: #ef4444;
   margin-top: var(--step-1);
 }
 
-/* Symptom scale: full-width tap targets, not a cramped radio row. */
+/* Symptom scale */
 .scale {
   border: 0;
   padding: 0;
@@ -284,6 +292,7 @@ a {
   font-size: 0.9375rem;
   padding: 0;
   margin-bottom: var(--step-2);
+  color: var(--text-dark);
 }
 
 .scale__options {
@@ -310,21 +319,22 @@ a {
   text-align: center;
   padding: 0.625rem 0.25rem;
   font-size: 0.8125rem;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--border-dark);
   border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--muted);
+  background: #0f172a;
+  color: var(--text-muted-dark);
 }
 
 .scale__option input:checked + span {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: #0369a1;
+  border-color: #38bdf8;
+  color: #ffffff;
   font-weight: 600;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
 }
 
 .scale__option input:focus-visible + span {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-dark);
   outline-offset: 2px;
 }
 
@@ -333,9 +343,9 @@ a {
   align-items: flex-start;
   gap: var(--step-2);
   padding: var(--step-3);
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--border-dark);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: #0f172a;
   margin-bottom: var(--step-4);
   cursor: pointer;
 }
@@ -344,12 +354,11 @@ a {
   width: 1.125rem;
   height: 1.125rem;
   margin: 0.1875rem 0 0;
-  accent-color: var(--accent);
+  accent-color: #38bdf8;
   flex-shrink: 0;
 }
 
-/* ---------- buttons ---------- */
-
+/* ---------- Buttons ---------- */
 .btn {
   font: inherit;
   font-weight: 500;
@@ -362,30 +371,31 @@ a {
   align-items: center;
   justify-content: center;
   gap: var(--step-2);
+  transition: all 0.2s ease;
 }
 
 .btn--primary {
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-dark);
+  color: #0f172a;
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: var(--accent-dark-hover);
 }
 
 .btn--secondary {
-  background: var(--surface);
-  color: var(--accent);
-  border-color: var(--rule-strong);
+  background: var(--surface-dark);
+  color: var(--accent-dark);
+  border-color: var(--border-dark);
 }
 
 .btn--secondary:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--accent-dark);
 }
 
 .btn--quiet {
   background: none;
-  color: var(--muted);
+  color: var(--text-muted-dark);
   padding: 0.375rem 0;
   min-height: auto;
   text-decoration: underline;
@@ -401,10 +411,15 @@ a {
   cursor: not-allowed;
 }
 
-/* ---------- status ---------- */
-
+/* ---------- Status band ---------- */
 .band {
   margin: var(--step-4) 0 var(--step-5);
+  background: var(--surface-dark);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  border: 1px solid var(--border-dark);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  color: var(--text-dark);
 }
 
 .band__value {
@@ -420,20 +435,15 @@ a {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
   font-size: 0.875rem;
-  color: var(--muted);
+  color: var(--text-muted-dark);
   margin: var(--step-1) 0 0;
 }
 
-.band--good .band__value {
-  color: var(--good);
-}
-.band--fair .band__value {
-  color: var(--fair);
-}
-.band--bad .band__value {
-  color: var(--bad);
-}
+.band--good .band__value { color: var(--good); }
+.band--fair .band__value { color: var(--fair); }
+.band--bad  .band__value { color: var(--bad); }
 
+/* ---------- Trail (why you got this result) ---------- */
 .trail {
   list-style: none;
   padding: 0;
@@ -446,7 +456,7 @@ a {
   display: flex;
   gap: var(--step-3);
   padding: var(--step-3) 0;
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--border-dark);
   font-size: 0.9375rem;
 }
 
@@ -454,12 +464,11 @@ a {
   content: counter(trail);
   font-family: var(--font-data);
   font-size: 0.75rem;
-  color: var(--faint);
+  color: var(--text-muted-dark);
   padding-top: 0.1875rem;
 }
 
-/* ---------- messages ---------- */
-
+/* ---------- Messages ---------- */
 .notice,
 .alert,
 .disclaimer {
@@ -470,32 +479,31 @@ a {
 }
 
 .notice {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
 }
 
 .alert {
-  background: var(--bad-soft);
-  color: var(--bad);
-  border-left: 3px solid var(--bad);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  background: rgba(127, 29, 29, 0.8);
+  color: #fecaca;
+  border: 1px solid #991b1b;
 }
 
 .disclaimer {
   background: none;
   padding: 0;
-  color: var(--faint);
+  color: #64748b;
   font-size: 0.8125rem;
+  font-style: italic;
 }
 
 .empty {
   text-align: center;
   padding: var(--step-6) var(--step-4);
-  color: var(--muted);
+  color: var(--text-muted-dark);
 }
 
-/* ---------- lists ---------- */
-
+/* ---------- Lists & helpers ---------- */
 .stack {
   list-style: none;
   padding: 0;
@@ -520,20 +528,20 @@ a {
   text-transform: uppercase;
   padding: 0.1875rem 0.5rem;
   border-radius: 999px;
-  background: var(--surface-sunk);
-  color: var(--muted);
-  border: 1px solid var(--rule);
+  background: #0f172a;
+  color: var(--text-muted-dark);
+  border: 1px solid var(--border-dark);
 }
 
 .pill--on {
-  background: var(--good-soft);
-  color: var(--good);
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
   border-color: transparent;
 }
 
 .pill--off {
-  background: var(--surface-sunk);
-  color: var(--faint);
+  background: #0f172a;
+  color: #64748b;
 }
 
 .sr-only {
@@ -548,6 +556,29 @@ a {
   border: 0;
 }
 
+/* ---------- Dark-mode input overrides (used by Onboarding) ---------- */
+input,
+select,
+textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+input::placeholder,
+select::placeholder,
+textarea::placeholder {
+  color: #64748b !important;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0f172a !important;
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+}
+
+/* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

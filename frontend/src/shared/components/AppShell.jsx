@@ -7,7 +7,9 @@ const NAV_BY_ROLE = {
     { to: "/patient/check-in", label: "Check in" },
     { to: "/patient/doctors", label: "Doctors" },
   ],
-  doctor: [{ to: "/doctor", label: "Patients", end: true }],
+  doctor: [{ to: "/doctor", label: "Patients", end: true },
+    { to: "/doctor/schedule", label: "Schedule" }
+  ],
   admin: [{ to: "/admin", label: "Doctors", end: true }],
 };
 

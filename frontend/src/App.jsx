@@ -13,6 +13,8 @@ import DoctorDirectory from "./patient/DoctorDirectory";
 import DoctorDashboard from "./doctor/pages/DoctorDashboard";
 import AdminDashboard from "./admin/pages/AdminDashboard";
 
+import DoctorSchedule from "./doctor/pages/DoctorSchedule";
+
 export default function App() {
   const { isSignedIn, role } = useAuth();
 
@@ -84,7 +86,18 @@ export default function App() {
         />
 
         <Route path="*" element={<NotFound />} />
-      </Routes>
+ <Route
+          path="/doctor/schedule"
+          element={
+            <ProtectedRoute allow={["doctor"]}>
+              <DoctorSchedule />
+            </ProtectedRoute>
+          }
+        />
+
+         </Routes>
+
+             
     </AppShell>
   );
 }
