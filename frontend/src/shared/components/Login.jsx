@@ -16,7 +16,7 @@ export default function Login() {
 
     try {
       if (auth?.login) {
-        
+        // Authenticate user with credentials
         await auth.login({ email, password });
       }
       navigate("/");
@@ -29,11 +29,20 @@ export default function Login() {
     <div style={{
       minHeight: "100vh",
       display: "flex",
+      flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: "#0f172a",
       padding: "20px"
     }}>
+      {/* CardioAI Logo with Pulse Icon */}
+      <div style={{ marginBottom: "20px", width: "100%", maxWidth: "400px" }}>
+        <Link to="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none", color: "#ffffff", fontSize: "20px", fontWeight: "700" }}>
+          <Pulse />
+          <span>CardioAI</span>
+        </Link>
+      </div>
+
       <div style={{
         width: "100%",
         maxWidth: "400px",
@@ -43,6 +52,13 @@ export default function Login() {
         boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
         color: "#f8fafc"
       }}>
+        {/* Back to Home Navigation Link */}
+        <div style={{ marginBottom: "16px" }}>
+          <Link to="/" style={{ color: "#38bdf8", textDecoration: "none", fontSize: "14px" }}>
+            ← Back to Home
+          </Link>
+        </div>
+
         <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "8px" }}>Sign in</h2>
         <p style={{ color: "#94a3b8", fontSize: "14px", marginBottom: "24px" }}>
           Welcome back. Your check-in takes about a minute.
@@ -124,5 +140,21 @@ export default function Login() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Pulse Icon Component
+function Pulse() {
+  return (
+    <svg width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+      <polyline
+        points="0,8 7,8 10,2 13,14 16,8 26,8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }

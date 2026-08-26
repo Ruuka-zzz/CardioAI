@@ -31,7 +31,7 @@ export default function PatientDashboard() {
         </h2>
         
         <p style={{ 
-          color: "#94a3b8", 
+          color: "#3c5a83", 
           fontSize: "15px", 
           lineHeight: "1.6", 
           marginBottom: "28px" 

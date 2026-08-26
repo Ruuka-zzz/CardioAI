@@ -6,6 +6,7 @@ import Signup from "./shared/components/Signup";
 import AppShell from "./shared/components/AppShell";
 import ProtectedRoute from "./shared/components/ProtectedRoute";
 import PatientDashboard from "./patient/PatientDashboard";
+import PatientOnboarding from "./patient/PatientOnboarding"; // <-- Onboarding ကို import လုပ်ရန်
 import DailyCheckIn from "./patient/DailyCheckIn";
 import DoctorDirectory from "./patient/DoctorDirectory";
 import DoctorDashboard from "./doctor/pages/DoctorDashboard";
@@ -47,6 +48,15 @@ export default function App() {
                 element={
                   <ProtectedRoute allow={["patient"]}>
                     <PatientDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Patient Onboarding Route အသစ်ထည့်သွင်းခြင်း */}
+              <Route
+                path="patient/onboarding"
+                element={
+                  <ProtectedRoute allow={["patient"]}>
+                    <PatientOnboarding />
                   </ProtectedRoute>
                 }
               />

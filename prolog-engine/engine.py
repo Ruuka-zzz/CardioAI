@@ -13,6 +13,7 @@ worker processes, not removing the lock.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,10 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 RULEBASE = Path(__file__).with_name("rules.pl")
+RULEBASE_DIR = str(RULEBASE.parent)
+
+# Guards both the Prolog engine (not thread-safe) and the chdir inside
+# _consult_rulebase, which changes state for the whole process.
 _lock = threading.Lock()
 
 SYMPTOM_KEYS = ("chest_pain", "breathlessness", "fatigue", "swelling", "dizziness")
@@ -38,6 +43,26 @@ class TriageResult:
     score: float
 
 
+def _consult_rulebase(prolog) -> None:
+    """Load rules.pl by bare filename, from its own directory.
+
+    pyswip builds a consult('<path>') term and hands it to Prolog's parser.
+    On Windows the path contains backslashes, and Prolog reads those inside a
+    quoted atom as escape sequences — "D:\\AIproject\\..." fails on \\A, which
+    is not a valid escape. Forward slashes don't help either: pyswip
+    normalises them back to the platform separator before the term is built.
+
+    Passing just "rules.pl" leaves no separators to misread. The cost is a
+    chdir, which is process-wide state, so every caller must hold _lock.
+    """
+    previous = os.getcwd()
+    os.chdir(RULEBASE_DIR)
+    try:
+        prolog.consult("rules.pl")
+    finally:
+        os.chdir(previous)
+
+
 def check_available() -> None:
     """Called at startup so a broken install surfaces immediately."""
     try:
@@ -51,8 +76,9 @@ def check_available() -> None:
         raise PrologUnavailable(f"Rulebase not found at {RULEBASE}")
 
     try:
-        prolog = Prolog()
-        prolog.consult(RULEBASE.as_posix())
+        with _lock:
+            prolog = Prolog()
+            _consult_rulebase(prolog)
     except Exception as err:  # noqa: BLE001 — pyswip raises bare exceptions
         raise PrologUnavailable(
             "SWI-Prolog could not be loaded. Install it from "
@@ -92,7 +118,7 @@ def run_triage(symptoms: dict[str, int], medication_taken: bool,
 
     with _lock:
         prolog = Prolog()
-        prolog.consult(RULEBASE.as_posix())
+        _consult_rulebase(prolog)
 
         for fact in facts:
             prolog.assertz(fact)

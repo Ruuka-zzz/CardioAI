@@ -134,20 +134,37 @@ export default function PatientOnboarding() {
   return (
     <div style={styles.container}>
       {/* Global override style injection to force inputs to be readable in dark mode */}
+      {/* Global override style injection to force inputs to be readable */}
       <style>{`
         input, select, textarea {
-          background-color: #0f172a !important;
-          color: #ffffff !important;
+          background-color: #ffffff !important;
+          color: #0f172a !important;
           border-color: #334155 !important;
+        }
+        /* Checkbox နဲ့ Form အတွင်းရှိ စာသားများ အမြဲမြင်ရစေရန် */
+        label, span, div {
+          color: #f8fafc;
+        }
+        /* Checkbox label သီးသန့် အမည်းရောင်လိုချင်ရင် ဒါမှမဟုတ် container ပေါ်မူတည်ပြီး ပြင်လို့ရပါတယ် */
+        input[type="checkbox"] + span, 
+        input[type="checkbox"] ~ label {
+          color: #f8fafc !important;
+        }
+        ::selection {
+          background-color: #38bdf8 !important;
+          color: #0f172a !important;
+        }
+        input::placeholder, select::placeholder, textarea::placeholder {
+          color: #64748b !important;
         }
         input:-webkit-autofill,
         input:-webkit-autofill:hover, 
         input:-webkit-autofill:focus {
-          -webkit-text-fill-color: #ffffff !important;
-          -webkit-box-shadow: 0 0 0px 1000px #0f172a inset !important;
+          -webkit-text-fill-color: #0f172a !important;
+          -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
         }
       `}</style>
-
+      
       <div style={styles.card}>
         <div style={styles.progressWrapper}>
           <div style={styles.stepIndicator}>

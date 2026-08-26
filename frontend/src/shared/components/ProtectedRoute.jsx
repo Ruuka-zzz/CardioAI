@@ -1,13 +1,14 @@
+import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { homeFor, useAuth } from "../auth/AuthContext";
+import { useAuth } from "../auth/AuthContext";
 
 /**
  * Keeps the wrong role out of a route.
  *
- * This is a routing convenience, not a security control — the backend checks
+ * This is a routing convenience, NOT a security control. The backend checks
  * the role on every request and is the only thing standing between a doctor
  * and a record they have no consent for. Never move an authorisation decision
- * up here.
+ * up here — a determined user can edit localStorage in ten seconds.
  */
 export default function ProtectedRoute({ allow, children }) {
   const { isSignedIn, role } = useAuth();
@@ -22,4 +23,11 @@ export default function ProtectedRoute({ allow, children }) {
   }
 
   return children;
+}
+
+function homeFor(role) {
+  if (role === "doctor") return "/doctor";
+  if (role === "admin") return "/admin";
+  if (role === "patient") return "/patient";
+  return "/";
 }

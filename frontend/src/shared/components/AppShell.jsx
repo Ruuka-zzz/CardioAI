@@ -1,71 +1,76 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 const NAV_BY_ROLE = {
   patient: [
-    { to: "/", label: "🏠 Home", isExternal: true }, // 👈 အပြင်ဘက်က Chat / Landing page သို့
-    { to: "/patient/onboarding", label: "📊 Today" },   // 👈 ပုံထဲက Intake form / Onboarding မျက်နှာပြင်သို့
+    { to: "/", label: "🏠 Home" },
+    { to: "/patient/onboarding", label: "📊 Today" },   
     { to: "/patient/check-in", label: "🌙 Check in" },
     { to: "/patient/doctors", label: "👨‍⚕️ Doctors" },
   ],
   doctor: [
-    { to: "/", label: "🏠 Home", isExternal: true },
+    { to: "/", label: "🏠 Home" },
     { to: "/doctor", label: "📊 Patients" },
   ],
   admin: [
-    { to: "/", label: "🏠 Home", isExternal: true },
+    { to: "/", label: "🏠 Home" },
     { to: "/admin", label: "📊 Doctors" },
   ],
 };
 
 export default function AppShell({ children }) {
   const { role, isSignedIn, signOut } = useAuth();
+  const location = useLocation(); // Get current route location
   
   const links = NAV_BY_ROLE[role] ?? [
-    { to: "/", label: "🏠 Home", isExternal: true },
+    { to: "/", label: "🏠 Home" },
   ];
-
-  const handleHomeClick = (e) => {
-    e.preventDefault();
-    window.location.replace("/"); // AppShell ကို ကျော်ပြီး အပြင်ဘက် Home (Chat/Landing) သို့ တိုက်ရိုက်သွားရန်
-  };
 
   return (
     <div style={styles.shellLayout}>
-      {/* ဘယ်ဘက် Sidebar */}
+      {/* Left Sidebar */}
       <aside style={styles.sidebar}>
         <div style={styles.topSection}>
-          <a href="/" onClick={handleHomeClick} style={styles.wordmark}>
+          <NavLink 
+            to="/" 
+            style={{
+              ...styles.wordmark,
+              ...(location.pathname === "/" ? styles.navLinkActive : {}),
+              borderRadius: "8px",
+              padding: "6px 8px"
+            }}
+          >
             <Pulse />
             <span>CardioAI</span>
-          </a>
+          </NavLink>
 
           <nav style={styles.sidebarNav} aria-label="Main">
             <ul style={styles.navList}>
-              {links.map((link) => (
-                <li key={link.to} style={styles.navItem}>
-                  {link.isExternal ? (
-                    <a href="/" onClick={handleHomeClick} style={styles.navLink}>
-                      {link.label}
-                    </a>
-                  ) : (
+              {links.map((link) => {
+                // Manually check if the link is active
+                const isActive = link.to === "/" 
+                  ? location.pathname === "/" 
+                  : location.pathname.startsWith(link.to);
+
+                return (
+                  <li key={link.to} style={styles.navItem}>
                     <NavLink
                       to={link.to}
-                      style={({ isActive }) => ({
+                      style={{
                         ...styles.navLink,
                         ...(isActive ? styles.navLinkActive : {}),
-                      })}
+                      }}
                     >
                       {link.label}
                     </NavLink>
-                  )}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </nav>
         </div>
 
-        {/* အောက်ဆုံး အပိုင်း (Sign out button) */}
+        {/* Bottom Section (Sign out button) */}
         {isSignedIn && (
           <div style={styles.sidebarFooter}>
             <button type="button" onClick={signOut} style={styles.signOutBtn}>
@@ -75,7 +80,7 @@ export default function AppShell({ children }) {
         )}
       </aside>
 
-      {/* ညာဘက် Main Content Area */}
+      {/* Right Main Content Area */}
       <main style={styles.mainContent}>
         <div style={styles.contentWrapper}>
           {children}
@@ -134,8 +139,8 @@ const styles = {
     fontWeight: "700",
     color: "#ffffff",
     textDecoration: "none",
-    paddingLeft: "12px",
     cursor: "pointer",
+    transition: "all 0.2s ease",
   },
   sidebarNav: {
     width: "100%",
