@@ -13,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api import admin, auth, chatbot, doctors, patients
 from config import get_settings
+from api import admin, auth, chatbot, doctors, patients, schedule
+...
 
 logging.basicConfig(level=logging.INFO)
 
@@ -40,6 +42,7 @@ app.include_router(patients.router)
 app.include_router(doctors.router)
 app.include_router(admin.router)
 app.include_router(chatbot.router)
+app.include_router(schedule.router)
 
 
 @app.get("/health", tags=["ops"])
