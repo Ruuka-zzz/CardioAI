@@ -43,6 +43,8 @@ class AskResponse(BaseModel):
 def load_store() -> None:
     try:
         retrieval.Store.load()
+                
+        log.info("Embedding model loaded")
     except FileNotFoundError as err:
         log.error("%s", err)
         log.error("Retrieval will return no matches until ingest.py is run.")
