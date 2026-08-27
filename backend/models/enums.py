@@ -32,10 +32,17 @@ class Urgency(str, enum.Enum):
 
 
 class AppointmentStatus(str, enum.Enum):
-    requested = "requested"
+    """No `requested` or `declined`.
+
+    Publishing working hours IS the doctor's consent, so a booking that
+    passes the rules in services/booking.py is confirmed on the spot. A
+    patient who books and then waits to hear back doesn't know whether they
+    have care — which is the uncertainty this product exists to remove.
+    """
+
     confirmed = "confirmed"
-    declined = "declined"
     cancelled = "cancelled"
+    completed = "completed"
 
 
 class CheckInSlot(str, enum.Enum):

@@ -23,9 +23,7 @@ def _busy_starts(db: Session, doctor_id: str, since: datetime) -> set[datetime]:
         .filter(
             Appointment.doctor_id == doctor_id,
             Appointment.starts_at >= since,
-            Appointment.status.in_(
-                [AppointmentStatus.requested, AppointmentStatus.confirmed]
-            ),
+            Appointment.status == AppointmentStatus.confirmed,
         )
         .all()
     )
@@ -102,9 +100,7 @@ def has_clash(db: Session, doctor_id: str, starts_at: datetime, ends_at: datetim
             Appointment.doctor_id == doctor_id,
             Appointment.starts_at < ends_at,
             Appointment.ends_at > starts_at,
-            Appointment.status.in_(
-                [AppointmentStatus.requested, AppointmentStatus.confirmed]
-            ),
+            Appointment.status == AppointmentStatus.confirmed,
         )
         .first()
         is not None

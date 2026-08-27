@@ -1,10 +1,17 @@
-"""Doctor discovery, booking, consent, and the consent-gated record read.
+"""Doctor discovery, booking, cancellation, consent, and record access.
 
-Booking and consent are separate endpoints. A confirmed appointment gives a
-doctor your time; only a consent grant gives them your history.
+Booking rules live in services/booking.py, not here. This module's job is
+HTTP: take a request, hand it to the rules, turn a refusal into a 409 with the
+rule's own wording. If you find yourself adding an `if` about times or
+capacity to this file, it belongs in the rules module instead.
+
+TWO THINGS A DOCTOR SEES WITHOUT CONSENT: who is coming (name, age, sex) and
+why (the reason they typed). Both are things the patient supplied precisely so
+the doctor would have them. The medical record is different and still gated —
+see services/consent.py.
 """
 
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -13,34 +20,101 @@ from api.deps import current_doctor, current_patient
 from config import get_settings
 from database.session import get_db
 from models import (
-    Appointment, AppointmentStatus, AvailabilitySlot, ConsentRecord, DailyCheckIn,
-    Doctor, FamilyHistory, Patient,
+    Appointment, AppointmentStatus, AvailabilitySlot, ConsentRecord,
+    DailyCheckIn, Doctor, FamilyHistory, Patient,
 )
 from schemas import (
-    AppointmentDecision, AppointmentRequest, AppointmentResponse, CheckInSummary,
+    AppointmentRequest, AppointmentResponse, CancelRequest, CheckInSummary,
     ConsentRequest, ConsentResponse, DoctorPublic, FamilyHistoryEntry,
     PatientRecordResponse, PatientSummary, SlotOption,
 )
+from services import booking as booking_rules
 from services import consent as consent_service
 from services import scheduling
 
-router = APIRouter(prefix="/api", tags=["doctors"])
+router = APIRouter(prefix="/api", tags=["appointments"])
 settings = get_settings()
 
+WEEKDAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-# ------------------------------------------------------------- discovery
+
+# ---------------------------------------------------------------- helpers
+
+def _age_from(dob: date | None) -> int | None:
+    if dob is None:
+        return None
+    today = date.today()
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+
+def _working_days(db: Session, doctor_id: str) -> list[str]:
+    rules = (
+        db.query(AvailabilitySlot)
+        .filter_by(doctor_id=doctor_id)
+        .order_by(AvailabilitySlot.weekday, AvailabilitySlot.start_time)
+        .all()
+    )
+    return [
+        f"{WEEKDAY_SHORT[r.weekday]} {r.start_time:%H:%M}-{r.end_time:%H:%M}"
+        for r in rules
+    ]
+
+
+def _to_response(db: Session, a: Appointment, *, for_doctor: bool) -> AppointmentResponse:
+    doctor = db.get(Doctor, a.doctor_id)
+    patient = db.get(Patient, a.patient_id)
+
+    return AppointmentResponse(
+        id=a.id,
+        doctor_id=a.doctor_id,
+        doctor_name=doctor.full_name if doctor else None,
+        hospital=doctor.hospital if doctor else None,
+        # A doctor sees who is coming; a patient looking at their own list
+        # doesn't need their own name echoed back.
+        patient_name=patient.full_name if (for_doctor and patient) else None,
+        patient_age=_age_from(patient.date_of_birth) if (for_doctor and patient) else None,
+        patient_sex=patient.sex if (for_doctor and patient) else None,
+        starts_at=a.starts_at,
+        ends_at=a.ends_at,
+        status=a.status.value,
+        reason=a.reason,
+        record_shared=consent_service.active_grant(db, a.patient_id, a.doctor_id)
+        is not None,
+        can_cancel=booking_rules.can_patient_cancel(a),
+        cancelled_by=a.cancelled_by,
+    )
+
+
+def _refuse(err: booking_rules.BookingRefused):
+    """Rule refusals are 409 Conflict — the request was well-formed, the
+    world just isn't in a state that allows it."""
+    raise HTTPException(status.HTTP_409_CONFLICT, err.message)
+
+
+# -------------------------------------------------------------- discovery
 
 @router.get("/doctors", response_model=list[DoctorPublic])
 def list_doctors(specialty: str | None = None, db: Session = Depends(get_db)):
-    """Public profiles only — never activation codes or contact details."""
+    """Public profiles. Never activation codes, never contact details."""
     query = db.query(Doctor).filter_by(activated=True)
     if specialty:
         query = query.filter(Doctor.specialty == specialty)
 
-    return [
-        DoctorPublic(id=d.id, full_name=d.full_name, specialty=d.specialty, bio=d.bio)
-        for d in query.all()
-    ]
+    out: list[DoctorPublic] = []
+    for d in query.order_by(Doctor.full_name).all():
+        slots = scheduling.open_slots(db, d.id)
+        out.append(DoctorPublic(
+            id=d.id,
+            staff_id=d.staff_id,
+            full_name=d.full_name,
+            specialty=d.specialty,
+            bio=d.bio,
+            hospital=d.hospital,
+            address=d.address,
+            working_days=_working_days(db, d.id),
+            next_available=slots[0][0] if slots else None,
+        ))
+    return out
 
 
 @router.get("/doctors/{doctor_id}/availability", response_model=list[SlotOption])
@@ -55,76 +129,69 @@ def availability(doctor_id: str, db: Session = Depends(get_db)):
     ]
 
 
-# --------------------------------------------------------------- booking
+# ---------------------------------------------------------------- booking
 
 @router.get("/appointments", response_model=list[AppointmentResponse])
 def my_appointments(
+    include_past: bool = False,
     db: Session = Depends(get_db),
     patient: Patient = Depends(current_patient),
 ):
-    rows = (
-        db.query(Appointment)
-        .filter_by(patient_id=patient.id)
-        .order_by(Appointment.starts_at)
-        .all()
-    )
-    return [
-        AppointmentResponse(
-            id=a.id, doctor_id=a.doctor_id, starts_at=a.starts_at,
-            ends_at=a.ends_at, status=a.status.value, reason=a.reason,
-            record_shared=consent_service.active_grant(db, patient.id, a.doctor_id)
-            is not None,
-        )
-        for a in rows
-    ]
+    query = db.query(Appointment).filter_by(patient_id=patient.id)
+    if not include_past:
+        query = query.filter(Appointment.starts_at >= datetime.utcnow())
+
+    rows = query.order_by(Appointment.starts_at).all()
+    return [_to_response(db, a, for_doctor=False) for a in rows]
 
 
 @router.post("/appointments", response_model=AppointmentResponse, status_code=201)
-def request_appointment(
+def book_appointment(
     body: AppointmentRequest,
     db: Session = Depends(get_db),
     patient: Patient = Depends(current_patient),
 ):
-    doctor = db.get(Doctor, body.doctor_id)
-    if doctor is None or not doctor.activated:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Doctor not found")
+    """Confirmed on the spot if every rule passes — there is no approval step.
 
-    ends_at = body.starts_at + timedelta(minutes=settings.appointment_minutes)
-    rules = db.query(AvailabilitySlot).filter_by(doctor_id=doctor.id).all()
-
-    if not scheduling.within_availability(rules, body.starts_at, ends_at):
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            "That time is outside this doctor's available hours.",
+    The full chain is in services/booking.py: doctor active, time in the
+    future, inside published hours, slot free, block not at capacity, patient
+    not already booked elsewhere at that time.
+    """
+    try:
+        appointment = booking_rules.create_appointment(
+            db,
+            patient=patient,
+            doctor_id=body.doctor_id,
+            starts_at=body.starts_at,
+            reason=body.reason,
         )
+    except booking_rules.BookingRefused as err:
+        _refuse(err)
 
-    if scheduling.has_clash(db, doctor.id, body.starts_at, ends_at):
-        raise HTTPException(status.HTTP_409_CONFLICT, "That slot is already taken.")
-
-    appointment = Appointment(
-        patient_id=patient.id,
-        doctor_id=doctor.id,
-        starts_at=body.starts_at,
-        ends_at=ends_at,
-        reason=body.reason,
-    )
-    db.add(appointment)
-    db.commit()
-    db.refresh(appointment)
-
-    return AppointmentResponse(
-        id=appointment.id,
-        doctor_id=doctor.id,
-        starts_at=appointment.starts_at,
-        ends_at=appointment.ends_at,
-        status=appointment.status.value,
-        reason=appointment.reason,
-        # Booking alone shares nothing.
-        record_shared=consent_service.active_grant(db, patient.id, doctor.id) is not None,
-    )
+    return _to_response(db, appointment, for_doctor=False)
 
 
-# --------------------------------------------------------------- consent
+@router.post("/appointments/{appointment_id}/cancel",
+             response_model=AppointmentResponse)
+def cancel_as_patient(
+    appointment_id: str,
+    body: CancelRequest | None = None,
+    db: Session = Depends(get_db),
+    patient: Patient = Depends(current_patient),
+):
+    appointment = db.get(Appointment, appointment_id)
+    if appointment is None or appointment.patient_id != patient.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Appointment not found")
+
+    try:
+        booking_rules.cancel_appointment(db, appointment, by_role="patient")
+    except booking_rules.BookingRefused as err:
+        _refuse(err)
+
+    return _to_response(db, appointment, for_doctor=False)
+
+
+# ---------------------------------------------------------------- consent
 
 @router.get("/consents", response_model=list[ConsentResponse])
 def my_consents(
@@ -170,13 +237,16 @@ def connected_patients(
     db: Session = Depends(get_db),
     doctor: Doctor = Depends(current_doctor),
 ):
-    """Patients who have booked with this doctor. Appearing here says nothing
-    about whether their record is readable — record_shared does."""
-    patient_ids = {
+    """Patients who have booked, or who have shared their record.
+
+    Appearing here says nothing about whether the record is readable —
+    `record_shared` does.
+    """
+    ids = {
         row.patient_id
         for row in db.query(Appointment).filter_by(doctor_id=doctor.id).all()
     }
-    patient_ids |= {
+    ids |= {
         g.patient_id
         for g in db.query(ConsentRecord)
         .filter_by(doctor_id=doctor.id, revoked_at=None)
@@ -184,7 +254,7 @@ def connected_patients(
     }
 
     out: list[PatientSummary] = []
-    for pid in patient_ids:
+    for pid in ids:
         patient = db.get(Patient, pid)
         if patient is None:
             continue
@@ -197,7 +267,48 @@ def connected_patients(
     return sorted(out, key=lambda p: p.full_name)
 
 
-@router.get("/doctor/patients/{patient_id}/record", response_model=PatientRecordResponse)
+@router.get("/doctor/appointments", response_model=list[AppointmentResponse])
+def doctor_appointments(
+    include_past: bool = False,
+    db: Session = Depends(get_db),
+    doctor: Doctor = Depends(current_doctor),
+):
+    query = db.query(Appointment).filter_by(doctor_id=doctor.id)
+    if not include_past:
+        query = query.filter(Appointment.starts_at >= datetime.utcnow())
+
+    rows = query.order_by(Appointment.starts_at).all()
+    return [_to_response(db, a, for_doctor=True) for a in rows]
+
+
+@router.post("/doctor/appointments/{appointment_id}/cancel",
+             response_model=AppointmentResponse)
+def cancel_as_doctor(
+    appointment_id: str,
+    body: CancelRequest | None = None,
+    db: Session = Depends(get_db),
+    doctor: Doctor = Depends(current_doctor),
+):
+    """Doctors are not held to the notice period.
+
+    Someone called into surgery an hour before clinic has to be able to
+    cancel — a patient arriving to an empty room is worse than a late
+    notification.
+    """
+    appointment = db.get(Appointment, appointment_id)
+    if appointment is None or appointment.doctor_id != doctor.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Appointment not found")
+
+    try:
+        booking_rules.cancel_appointment(db, appointment, by_role="doctor")
+    except booking_rules.BookingRefused as err:
+        _refuse(err)
+
+    return _to_response(db, appointment, for_doctor=True)
+
+
+@router.get("/doctor/patients/{patient_id}/record",
+            response_model=PatientRecordResponse)
 def read_patient_record(
     patient_id: str,
     db: Session = Depends(get_db),
@@ -210,9 +321,7 @@ def read_patient_record(
     if patient is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Patient not found")
 
-    consent_service.log_access(
-        db, doctor.user_id, patient_id, "read_record", grant.id
-    )
+    consent_service.log_access(db, doctor.user_id, patient_id, "read_record", grant.id)
 
     checkins = (
         db.query(DailyCheckIn)
@@ -253,62 +362,4 @@ def read_patient_record(
             )
             for c in checkins
         ],
-    )
-
-
-@router.get("/doctor/appointments", response_model=list[AppointmentResponse])
-def doctor_appointments(
-    db: Session = Depends(get_db),
-    doctor: Doctor = Depends(current_doctor),
-):
-    rows = (
-        db.query(Appointment)
-        .filter_by(doctor_id=doctor.id)
-        .order_by(Appointment.starts_at)
-        .all()
-    )
-
-    out: list[AppointmentResponse] = []
-    for a in rows:
-        patient = db.get(Patient, a.patient_id)
-        out.append(AppointmentResponse(
-            id=a.id,
-            doctor_id=a.doctor_id,
-            patient_name=patient.full_name if patient else None,
-            starts_at=a.starts_at,
-            ends_at=a.ends_at,
-            status=a.status.value,
-            reason=a.reason,
-            record_shared=consent_service.active_grant(db, a.patient_id, doctor.id)
-            is not None,
-        ))
-    return out
-
-
-@router.patch("/doctor/appointments/{appointment_id}", response_model=AppointmentResponse)
-def respond_to_appointment(
-    appointment_id: str,
-    body: AppointmentDecision,
-    db: Session = Depends(get_db),
-    doctor: Doctor = Depends(current_doctor),
-):
-    appointment = db.get(Appointment, appointment_id)
-    if appointment is None or appointment.doctor_id != doctor.id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Appointment not found")
-
-    appointment.status = AppointmentStatus(body.status)
-    db.commit()
-    db.refresh(appointment)
-
-    patient = db.get(Patient, appointment.patient_id)
-    return AppointmentResponse(
-        id=appointment.id,
-        doctor_id=appointment.doctor_id,
-        patient_name=patient.full_name if patient else None,
-        starts_at=appointment.starts_at,
-        ends_at=appointment.ends_at,
-        status=appointment.status.value,
-        reason=appointment.reason,
-        record_shared=consent_service.active_grant(db, appointment.patient_id, doctor.id)
-        is not None,
     )

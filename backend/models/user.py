@@ -1,8 +1,8 @@
 """Identity: User, and the Patient / Doctor profiles hanging off it."""
 
 from sqlalchemy import (
-    Boolean, Column, Enum, Float, ForeignKey, Integer, JSON, String, Time,
-    DateTime,
+    Boolean, Column, Date, DateTime, Enum, Float, ForeignKey, Integer, JSON,
+    String, Time,
 )
 from sqlalchemy.orm import relationship
 
@@ -30,6 +30,13 @@ class Patient(Base, IdMixin, TimestampMixin):
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
     full_name = Column(String, nullable=False)
 
+    # Demographics, NOT clinical findings — which is why they live here and
+    # not in MedicalRecord. A doctor seeing an appointment needs to know who
+    # is coming; reading their history still requires consent.
+    # Date of birth rather than age, so it never goes stale.
+    date_of_birth = Column(Date, nullable=True)
+    sex = Column(String, nullable=True)
+
     # Daily triage compares against this, so check-ins are blocked until the
     # intake form is submitted and the baseline is set.
     onboarding_complete = Column(Boolean, default=False, nullable=False)
@@ -53,12 +60,24 @@ class Doctor(Base, IdMixin, TimestampMixin):
     __tablename__ = "doctors"
 
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=True)
+
+    # Permanent, public-facing doctor number (CA-DOC-0001). Shown on the
+    # dashboard and quotable over the phone. NOT a credential.
+    staff_id = Column(String, unique=True, nullable=True, index=True)
+
+    # One-time secret used to claim the account, then spent. Never displayed
+    # once `activated` is True.
     activation_code = Column(String, unique=True, nullable=False, index=True)
     activated = Column(Boolean, default=False, nullable=False)
 
     full_name = Column(String, nullable=False)
     specialty = Column(String, nullable=False)
     bio = Column(String, nullable=True)
+
+    # Where the patient physically goes. Shown in the directory — a patient
+    # choosing a doctor needs the place at least as much as the credentials.
+    hospital = Column(String, nullable=True)
+    address = Column(String, nullable=True)
 
     user = relationship("User", back_populates="doctor")
     slots = relationship("AvailabilitySlot", back_populates="doctor")
@@ -74,5 +93,10 @@ class AvailabilitySlot(Base, IdMixin):
     weekday = Column(Integer, nullable=False)  # 0 = Monday
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
+
+    # Ceiling on bookings in this block per day. NULL = as many as fit.
+    # A second, lower limit on top of slot exclusivity, for clinics that run
+    # a queue inside a window rather than fixed appointment times.
+    capacity = Column(Integer, nullable=True)
 
     doctor = relationship("Doctor", back_populates="slots")
