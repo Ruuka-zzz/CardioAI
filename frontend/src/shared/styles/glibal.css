@@ -1,589 +1,787 @@
-/* =========================================================
-   CardioAI – Global Styles
-   =========================================================
-   Design direction:
-   - Dark clinical UI (slate-950 / slate-900) for dashboards
-   - Light “paper logbook” tokens kept for StatusBand / older pages
-   - One accent (teal/emerald) for actions
-   - Red / amber / green ONLY for status (good / fair / bad)
-   ========================================================= */
 
+
+/* ============================================================
+   CardioAI — design system on Tailwind v4
+   ============================================================
+
+   DIRECTION: "instrument panel."
+
+   One organising rule: COLOUR IS SEMANTIC, NEVER DECORATIVE.
+   Green, amber and red appear only as condition status. Everything
+   else — buttons, links, chrome — is neutral. That is why there is no
+   brand colour: a green logo would compete with "condition: good"
+   every time they share a screen, and the signal that matters most
+   would be the one that got diluted.
+
+   HOW THEMING WORKS HERE
+   Tailwind v4 resolves @theme values at build time, so they cannot
+   switch per theme on their own. The fix is two layers:
+     1. raw tokens in :root / [data-theme="dark"]  — these swap
+     2. @theme inline mapping them to Tailwind names — these don't
+   `inline` is load-bearing: without it Tailwind copies the value
+   instead of the var() reference, and dark mode silently stops working.
+
+   Result: utilities (bg-surface, text-ink, border-line) and the
+   component classes below both follow the theme automatically.
+
+   BURMESE: shared/heart-failure-enums.js carries Burmese labels.
+   Burmese stacks diacritics above and below the baseline and needs
+   ~1.9 line-height or the marks collide. See :lang(my).
+   ============================================================ */
+
+/* Drives dark: on [data-theme="dark"]. Also lets you write dark:
+   utilities in JSX if a component needs a per-theme tweak. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------- 1. raw tokens (these swap per theme) ---------- */
 @import "tailwindcss";
-/* ---------- Design tokens ---------- */
 :root {
-  /* Light / paper theme (used by StatusBand + older shell) */
-  --paper: #eff3f2;
+  --bg: #f4f6f5;
   --surface: #ffffff;
-  --surface-sunk: #f6f8f8;
-  --ink: #0f1a20;
-  --muted: #55666f;
-  --faint: #7d8c94;
-  --rule: #d7dfe0;
-  --rule-strong: #b9c6c8;
-
-  --accent: #0b5c63;
-  --accent-hover: #094a50;
-  --accent-soft: #e0eded;
-
-  --good: #1c6b4f;
-  --good-soft: #e3f0ea;
-  --fair: #96590a;
-  --fair-soft: #f8eddc;
-  --bad: #a3231c;
-  --bad-soft: #f8e4e2;
-
-  /* Dark theme overrides (most current pages) */
-  --bg-dark: #0f172a;          /* slate-950 */
-  --surface-dark: #1e293b;     /* slate-900 */
-  --border-dark: #334155;      /* slate-700 */
-  --text-dark: #f8fafc;
-  --text-muted-dark: #94a3b8;
-  --accent-dark: #10b981;      /* emerald-500 */
-  --accent-dark-hover: #34d399;
-
-  /* Typography */
-  --font-display: "Archivo", system-ui, sans-serif;
-  --font-body: "Public Sans", system-ui, sans-serif;
-  --font-data: "IBM Plex Mono", ui-monospace, monospace;
-
-  /* Spacing scale */
-  --step-1: 0.25rem;
-  --step-2: 0.5rem;
-  --step-3: 0.75rem;
-  --step-4: 1rem;
-  --step-5: 1.5rem;
-  --step-6: 2rem;
-  --step-7: 3rem;
-
-  --radius: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
-  --measure: 34rem;
-}
-
-/* ---------- Reset & base ---------- */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  -webkit-text-size-adjust: 100%;
-}
-
-html,
-body,
-#root {
-  width: 100%;
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-  background-color: var(--bg-dark);
-  color: var(--text-dark);
-  overflow-x: hidden;
-}
-
-body {
-  font-family: var(--font-body);
-  font-size: 1rem;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-}
-
-h1, h2, h3 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  line-height: 1.2;
-  margin: 0 0 var(--step-3);
-  text-wrap: balance;
-}
-
-h1 { font-size: 1.625rem; }
-h2 { font-size: 1.25rem; }
-h3 { font-size: 1rem; }
-
-p { margin: 0 0 var(--step-4); }
-
-a {
-  color: var(--accent-dark);
-  text-underline-offset: 3px;
-}
-
-:focus-visible {
-  outline: 2px solid var(--accent-dark);
-  outline-offset: 2px;
-  border-radius: 3px;
-}
-
-/* ---------- Layout helpers ---------- */
-.shell {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.shell__bar {
-  background: var(--surface-dark);
-  border-bottom: 1px solid var(--border-dark);
-  padding: var(--step-3) var(--step-4);
-}
-
-.shell__bar-inner {
-  max-width: var(--measure);
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--step-3);
-}
-
-.shell__main {
-  flex: 1;
-  width: 100%;
-  max-width: var(--measure);
-  margin: 0 auto;
-  padding: var(--step-6) var(--step-4) var(--step-7);
-}
-
-.shell__nav {
-  background: var(--surface-dark);
-  border-top: 1px solid var(--border-dark);
-  position: sticky;
-  bottom: 0;
-}
-
-.shell__nav ul {
-  max-width: var(--measure);
-  margin: 0 auto;
-  padding: 0;
-  list-style: none;
-  display: flex;
-}
-
-.shell__nav a {
-  display: block;
-  padding: var(--step-3) var(--step-2);
-  text-align: center;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-muted-dark);
-  text-decoration: none;
-  border-top: 2px solid transparent;
-  margin-top: -1px;
-}
-
-.shell__nav li { flex: 1; }
-
-.shell__nav a[aria-current="page"] {
-  color: var(--accent-dark);
-  border-top-color: var(--accent-dark);
-}
-
-/* ---------- Wordmark ---------- */
-.wordmark {
-  display: flex;
-  align-items: center;
-  gap: var(--step-2);
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.0625rem;
-  letter-spacing: -0.02em;
-  color: var(--text-dark);
-  text-decoration: none;
-  margin-right: auto;
-}
-
-.wordmark svg {
-  display: block;
-  color: var(--accent-dark);
-}
-
-/* ---------- Cards ---------- */
-.card {
-  background: var(--surface-dark);
-  border: 1px solid var(--border-dark);
-  border-radius: var(--radius-xl);
-  padding: var(--step-5);
-  margin-bottom: var(--step-4);
-  color: var(--text-dark);
-}
-
-.card--sunk {
-  background: #0f172a;
-  border-style: dashed;
-}
-
-.eyebrow {
-  font-family: var(--font-data);
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted-dark);
-  margin: 0 0 var(--step-2);
-}
-
-.lede {
-  color: var(--text-muted-dark);
-}
-
-.readout {
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---------- Forms ---------- */
-.field {
-  margin-bottom: var(--step-4);
-}
-
-.field__label {
-  display: block;
-  font-weight: 500;
-  font-size: 0.9375rem;
-  margin-bottom: var(--step-1);
-  color: #cbd5e1;
-}
-
-.field__hint {
-  display: block;
-  font-size: 0.8125rem;
-  color: var(--text-muted-dark);
-  margin-bottom: var(--step-2);
-}
-
-.field__control {
-  width: 100%;
-  font: inherit;
-  color: #0f172a;
-  background: #ffffff;
-  border: 1px solid var(--border-dark);
-  border-radius: var(--radius);
-  padding: 0.625rem 0.75rem;
-  min-height: 2.75rem;
-}
-
-.field__control:focus-visible {
-  border-color: var(--accent-dark);
-}
-
-.field__control[aria-invalid="true"] {
-  border-color: #ef4444;
-}
-
-.field__error {
-  display: block;
-  font-size: 0.8125rem;
-  color: #ef4444;
-  margin-top: var(--step-1);
-}
-
-/* Symptom scale */
-.scale {
-  border: 0;
-  padding: 0;
-  margin: 0 0 var(--step-5);
-}
-
-.scale legend {
-  font-weight: 500;
-  font-size: 0.9375rem;
-  padding: 0;
-  margin-bottom: var(--step-2);
-  color: var(--text-dark);
-}
-
-.scale__options {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--step-1);
-}
-
-.scale__option {
-  position: relative;
-}
-
-.scale__option input {
-  position: absolute;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  cursor: pointer;
-}
-
-.scale__option span {
-  display: block;
-  text-align: center;
-  padding: 0.625rem 0.25rem;
-  font-size: 0.8125rem;
-  border: 1px solid var(--border-dark);
-  border-radius: var(--radius);
-  background: #0f172a;
-  color: var(--text-muted-dark);
-}
-
-.scale__option input:checked + span {
-  background: #0369a1;
-  border-color: #38bdf8;
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
-}
-
-.scale__option input:focus-visible + span {
-  outline: 2px solid var(--accent-dark);
-  outline-offset: 2px;
-}
-
-.checkbox {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--step-2);
-  padding: var(--step-3);
-  border: 1px solid var(--border-dark);
-  border-radius: var(--radius);
-  background: #0f172a;
-  margin-bottom: var(--step-4);
-  cursor: pointer;
-}
-
-.checkbox input {
-  width: 1.125rem;
-  height: 1.125rem;
-  margin: 0.1875rem 0 0;
-  accent-color: #38bdf8;
-  flex-shrink: 0;
-}
-
-/* ---------- Buttons ---------- */
-.btn {
-  font: inherit;
-  font-weight: 500;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  padding: 0.6875rem 1.125rem;
-  min-height: 2.75rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--step-2);
-  transition: all 0.2s ease;
-}
-
-.btn--primary {
-  background: var(--accent-dark);
-  color: #0f172a;
-}
-
-.btn--primary:hover:not(:disabled) {
-  background: var(--accent-dark-hover);
-}
-
-.btn--secondary {
-  background: var(--surface-dark);
-  color: var(--accent-dark);
-  border-color: var(--border-dark);
-}
-
-.btn--secondary:hover:not(:disabled) {
-  border-color: var(--accent-dark);
-}
-
-.btn--quiet {
-  background: none;
-  color: var(--text-muted-dark);
-  padding: 0.375rem 0;
-  min-height: auto;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.btn--block {
-  width: 100%;
-}
-
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* ---------- Status band ---------- */
-.band {
-  margin: var(--step-4) 0 var(--step-5);
-  background: var(--surface-dark);
-  border-radius: var(--radius-xl);
-  padding: 24px;
-  border: 1px solid var(--border-dark);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-  color: var(--text-dark);
-}
-
-.band__value {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 600;
-  text-transform: capitalize;
-  line-height: 1.1;
-  margin: 0;
-}
-
-.band__score {
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.875rem;
-  color: var(--text-muted-dark);
-  margin: var(--step-1) 0 0;
-}
-
-.band--good .band__value { color: var(--good); }
-.band--fair .band__value { color: var(--fair); }
-.band--bad  .band__value { color: var(--bad); }
-
-/* ---------- Trail (why you got this result) ---------- */
-.trail {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  counter-reset: trail;
-}
-
-.trail li {
-  counter-increment: trail;
-  display: flex;
-  gap: var(--step-3);
-  padding: var(--step-3) 0;
-  border-top: 1px solid var(--border-dark);
-  font-size: 0.9375rem;
-}
-
-.trail li::before {
-  content: counter(trail);
-  font-family: var(--font-data);
-  font-size: 0.75rem;
-  color: var(--text-muted-dark);
-  padding-top: 0.1875rem;
-}
-
-/* ---------- Messages ---------- */
-.notice,
-.alert,
-.disclaimer {
-  border-radius: var(--radius);
-  padding: var(--step-3) var(--step-4);
-  margin-bottom: var(--step-4);
-  font-size: 0.9375rem;
-}
-
-.notice {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-}
-
-.alert {
-  background: rgba(127, 29, 29, 0.8);
-  color: #fecaca;
-  border: 1px solid #991b1b;
-}
-
-.disclaimer {
-  background: none;
-  padding: 0;
-  color: #64748b;
-  font-size: 0.8125rem;
-  font-style: italic;
-}
-
-.empty {
-  text-align: center;
-  padding: var(--step-6) var(--step-4);
-  color: var(--text-muted-dark);
-}
-
-/* ---------- Lists & helpers ---------- */
-.stack {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.stack > li + li {
-  margin-top: var(--step-3);
-}
-
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--step-2);
-  align-items: center;
-}
-
-.pill {
-  font-family: var(--font-data);
-  font-size: 0.6875rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.1875rem 0.5rem;
-  border-radius: 999px;
-  background: #0f172a;
-  color: var(--text-muted-dark);
-  border: 1px solid var(--border-dark);
-}
-
-.pill--on {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border-color: transparent;
-}
-
-.pill--off {
-  background: #0f172a;
-  color: #64748b;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* ---------- Dark-mode input overrides (used by Onboarding) ---------- */
-input,
-select,
-textarea {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #334155 !important;
-}
-
-input::placeholder,
-select::placeholder,
-textarea::placeholder {
-  color: #64748b !important;
-}
-
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus {
-  -webkit-text-fill-color: #0f172a !important;
-  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
-}
-
-/* ---------- Reduced motion ---------- */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+  --surface-raised: #ffffff;
+  --surface-sunk: #eaeeec;
+
+  --line: #dfe4e2;
+  --line-strong: #bcc5c2;
+
+  --ink: #0f1618;
+  --ink-muted: #566065;
+  --ink-faint: #7b878b;
+
+  /* The one non-semantic colour: interaction. Deliberately blue so it
+     can never be mistaken for a status. */
+  --focus: #1d4ed8;
+  --focus-soft: rgb(29 78 216 / 0.14);
+
+  --good: #15803d;
+  --good-soft: rgb(21 128 61 / 0.10);
+  --fair: #a16207;
+  --fair-soft: rgb(161 98 7 / 0.10);
+  --bad: #b91c1c;
+  --bad-soft: rgb(185 28 28 / 0.10);
+
+  /* Buttons: maximum contrast, zero colour. */
+  --action-bg: #0f1618;
+  --action-ink: #ffffff;
+  --action-bg-hover: #000000;
+}
+
+[data-theme="dark"] {
+  /* Warm-neutral near-black, not navy — navy plus neon reads as crypto
+     dashboard, and the warmth is easier on long reading. */
+  --bg: #101314;
+  --surface: #171b1d;
+  --surface-raised: #1e2325;
+  --surface-sunk: #0c0e0f;
+
+  --line: #262d30;
+  --line-strong: #374044;
+
+  /* Not pure white: #fff on near-black haloes and tires the eye. */
+  --ink: #eef1f0;
+  --ink-muted: #9daaad;
+  --ink-faint: #6b7679;
+
+  --focus: #6ea8fe;
+  --focus-soft: rgb(110 168 254 / 0.16);
+
+  /* Lifted and desaturated for legibility on dark ground. */
+  --good: #4ade80;
+  --good-soft: rgb(74 222 128 / 0.12);
+  --fair: #fbbf5c;
+  --fair-soft: rgb(251 191 92 / 0.12);
+  --bad: #f87171;
+  --bad-soft: rgb(248 113 113 / 0.12);
+
+  --action-bg: #eef1f0;
+  --action-ink: #101314;
+  --action-bg-hover: #ffffff;
+}
+
+/* ---------- 2. Tailwind theme (generates the utilities) ---------- */
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-sunk: var(--surface-sunk);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-muted: var(--ink-muted);
+  --color-faint: var(--ink-faint);
+
+  --color-focus: var(--focus);
+  --color-good: var(--good);
+  --color-fair: var(--fair);
+  --color-bad: var(--bad);
+
+  --font-sans: "Schibsted Grotesk", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  --font-my: "Noto Sans Myanmar", "Padauk", "Schibsted Grotesk", sans-serif;
+
+  --radius-card: 14px;
+  --radius-control: 8px;
+
+  /* Reading width vs dashboard width. */
+  --container-measure: 36rem;
+  --container-wide: 64rem;
+}
+
+/* ---------- 3. base ---------- */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
   }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;        /* 17px — older eyes, phone-first */
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  :lang(my) {
+    font-family: var(--font-my);
+    line-height: 1.9;
+  }
+
+  h1, h2, h3 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  h1 { font-size: clamp(1.75rem, 1.3rem + 2vw, 2.5rem); }
+  h2 { font-size: clamp(1.25rem, 1.1rem + 0.7vw, 1.5rem); }
+  h3 { font-size: 1.0625rem; }
+
+  h1, h2, h3, p { margin: 0 0 0.75rem; }
+  p { margin-bottom: 1rem; }
+  p:last-child { margin-bottom: 0; }
+
+  a {
+    color: var(--ink);
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 4px;
+    text-decoration-thickness: 1px;
+  }
+  a:hover { text-decoration-color: var(--focus); }
+
+  /* One focus style everywhere, visible on every surface in both themes. */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus-soft), 0 0 0 1px var(--focus);
+    border-radius: var(--radius-control);
+  }
+
+  ::selection {
+    background: var(--focus-soft);
+    color: var(--ink);
+  }
+}
+
+/* ---------- 4. components ---------- */
+
+@layer components {
+
+  /* --- layout --- */
+
+  .shell {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .shell__bar {
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    padding: 0.75rem 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+
+  .shell__bar-inner {
+    max-width: var(--container-wide);
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .shell__main {
+    flex: 1;
+    width: 100%;
+    max-width: var(--container-measure);
+    margin-inline: auto;
+    padding: 2rem 1rem 4.5rem;
+  }
+
+  .shell__main--wide { max-width: var(--container-wide); }
+
+  /* Bottom nav: twice-daily use, one-handed, sometimes an unsteady grip. */
+  .shell__nav {
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--line);
+    position: sticky;
+    bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 20;
+  }
+
+  .shell__nav ul {
+    max-width: var(--container-measure);
+    margin-inline: auto;
+    padding: 0;
+    list-style: none;
+    display: flex;
+  }
+
+  .shell__nav li { flex: 1; }
+
+  .shell__nav a {
+    display: block;
+    padding: 0.75rem 0.5rem;
+    min-height: 3.25rem;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--ink-muted);
+    text-decoration: none;
+    border-top: 2px solid transparent;
+    margin-top: -1px;
+    transition: color 0.15s ease;
+  }
+
+  .shell__nav a:hover { color: var(--ink); }
+
+  .shell__nav a[aria-current="page"] {
+    color: var(--ink);
+    border-top-color: var(--ink);
+  }
+
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 1.125rem;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    text-decoration: none;
+    margin-right: auto;
+  }
+
+  .wordmark svg { display: block; color: var(--ink); }
+
+  /* --- surfaces --- */
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+
+  /* Hairline top highlight instead of a drop shadow: reads as lit from
+     above, costs no blur, works in both themes. */
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .card--sunk {
+    background: var(--surface-sunk);
+    border-style: dashed;
+  }
+  .card--sunk::before { display: none; }
+
+  /* --- text --- */
+
+  /* Eyebrow with a leading rule — the one piece of ornament in the
+     system. Marks a section start without a heavier heading. */
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 0.5rem;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 1.25rem;
+    height: 1px;
+    background: var(--line-strong);
+    flex-shrink: 0;
+  }
+
+  .lede {
+    color: var(--ink-muted);
+    font-size: 1.0625rem;
+  }
+
+  /* Every number in the product: tabular so digits don't jitter as
+     values change, mono so they read as instrument output. */
+  .readout {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  .disclaimer {
+    color: var(--ink-faint);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+
+  /* --- buttons --- */
+
+  .btn {
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    border-radius: var(--radius-control);
+    border: 1px solid transparent;
+    padding: 0.75rem 1.25rem;
+    min-height: 3rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background 0.15s ease, border-color 0.15s ease,
+                transform 0.06s ease;
+  }
+
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+
+  .btn--primary {
+    background: var(--action-bg);
+    color: var(--action-ink);
+  }
+  .btn--primary:hover:not(:disabled) { background: var(--action-bg-hover); }
+
+  .btn--secondary {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+  .btn--secondary:hover:not(:disabled) {
+    border-color: var(--ink-muted);
+    background: var(--surface-raised);
+  }
+
+  .btn--quiet {
+    background: none;
+    color: var(--ink-muted);
+    padding: 0.5rem 0;
+    min-height: auto;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    text-decoration-color: var(--line-strong);
+  }
+  .btn--quiet:hover:not(:disabled) { color: var(--ink); }
+
+  /* The one place a status colour leaves the status system — because
+     "this removes something" is itself a warning. */
+  .btn--danger {
+    background: transparent;
+    color: var(--bad);
+    border-color: var(--bad);
+  }
+  .btn--danger:hover:not(:disabled) { background: var(--bad-soft); }
+
+  .btn--block { width: 100%; }
+
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn[aria-busy="true"] { cursor: progress; }
+
+  /* --- forms --- */
+
+  .field { margin-bottom: 1.5rem; }
+
+  .field__label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .field__hint {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .field__control {
+    width: 100%;
+    font: inherit;
+    font-size: 1rem;
+    color: var(--ink);
+    background: var(--surface-sunk);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-control);
+    padding: 0.75rem 0.875rem;
+    min-height: 3rem;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .field__control::placeholder { color: var(--ink-faint); }
+  .field__control:hover { border-color: var(--ink-faint); }
+
+  .field__control:focus {
+    outline: none;
+    border-color: var(--focus);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px var(--focus-soft);
+  }
+
+  .field__control[aria-invalid="true"] { border-color: var(--bad); }
+
+  /* Numbers typed into a form are still numbers. */
+  .field__control[type="number"],
+  .field__control[type="time"],
+  .field__control[type="date"] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  select.field__control {
+    appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:
+      calc(100% - 1.25rem) calc(50% + 2px),
+      calc(100% - 0.9rem) calc(50% + 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 2.5rem;
+  }
+
+  .field__error {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--bad);
+    margin-top: 0.5rem;
+  }
+
+  /* Symptom scale — four full-width targets, not a cramped radio row.
+     The control patients touch most gets the most room. */
+  .scale { border: 0; padding: 0; margin: 0 0 2rem; }
+
+  .scale legend {
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 0;
+    margin-bottom: 0.75rem;
+  }
+
+  .scale__options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.25rem;
+  }
+
+  .scale__option { position: relative; }
+
+  .scale__option input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .scale__option span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.25rem;
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-control);
+    background: var(--surface-sunk);
+    color: var(--ink-muted);
+    transition: background 0.15s ease, border-color 0.15s ease,
+                color 0.15s ease;
+  }
+
+  .scale__option input:hover + span { border-color: var(--ink-faint); }
+
+  .scale__option input:checked + span {
+    background: var(--action-bg);
+    border-color: var(--action-bg);
+    color: var(--action-ink);
+    font-weight: 600;
+  }
+
+  .scale__option input:focus-visible + span {
+    box-shadow: 0 0 0 3px var(--focus-soft), 0 0 0 1px var(--focus);
+  }
+
+  .checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-control);
+    background: var(--surface-sunk);
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+
+  .checkbox:hover { border-color: var(--ink-faint); }
+
+  .checkbox input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0.2rem 0 0;
+    accent-color: var(--focus);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .checkbox:has(input:focus-visible) {
+    box-shadow: 0 0 0 3px var(--focus-soft), 0 0 0 1px var(--focus);
+  }
+
+  /* --- status --- */
+
+  .band { margin: 1rem 0 1.5rem; }
+
+  .band__value {
+    font-size: clamp(2rem, 1.6rem + 1.8vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    text-transform: capitalize;
+    line-height: 1.05;
+    margin: 0;
+  }
+
+  .band__score {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.875rem;
+    color: var(--ink-muted);
+    margin: 0.25rem 0 0;
+  }
+
+  .band--good .band__value { color: var(--good); }
+  .band--fair .band__value { color: var(--fair); }
+  .band--bad  .band__value { color: var(--bad); }
+
+  /* The fired rules. This is the product's whole argument, so it is
+     typeset as a numbered sequence rather than a bullet list. */
+  .trail { list-style: none; padding: 0; margin: 0; counter-reset: trail; }
+
+  .trail li {
+    counter-increment: trail;
+    display: grid;
+    grid-template-columns: 1.5rem 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--line);
+    font-size: 0.9375rem;
+  }
+
+  .trail li::before {
+    content: counter(trail, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    padding-top: 0.2rem;
+  }
+
+  /* --- messages --- */
+
+  .notice,
+  .alert {
+    border-radius: var(--radius-control);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9375rem;
+    border-left: 3px solid;
+  }
+
+  .notice {
+    background: var(--surface-raised);
+    border-left-color: var(--line-strong);
+    color: var(--ink);
+  }
+
+  .alert {
+    background: var(--bad-soft);
+    border-left-color: var(--bad);
+    color: var(--ink);
+  }
+
+  .alert--urgent { border-left-width: 5px; }
+
+  .empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--ink-muted);
+    border: 1px dashed var(--line);
+    border-radius: var(--radius-card);
+  }
+
+  /* --- lists & chips --- */
+
+  .stack { list-style: none; padding: 0; margin: 0; }
+  .stack > li + li { margin-top: 0.75rem; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+  .row--between { justify-content: space-between; }
+
+  .grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    background: var(--surface-raised);
+    color: var(--ink-muted);
+    border: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  .pill--on   { background: var(--good-soft); color: var(--good); border-color: transparent; }
+  .pill--off  { background: transparent; color: var(--ink-faint); }
+  .pill--warn { background: var(--fair-soft); color: var(--fair); border-color: transparent; }
+  .pill--bad  { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+
+  /* --- landing --- */
+
+  /* Deliberately plain: no gradient, no glow, no badge. A product that
+     tells people their chest pain needs emergency care should not open
+     like a launch announcement. Restraint reads as competence. */
+  .hero {
+    padding: 4.5rem 0 3rem;
+    text-align: center;
+    max-width: 34rem;
+    margin-inline: auto;
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 1.4rem + 3vw, 3.25rem);
+    letter-spacing: -0.035em;
+    margin-bottom: 1rem;
+  }
+
+  .hero p {
+    font-size: 1.125rem;
+    color: var(--ink-muted);
+    margin-bottom: 2rem;
+  }
+
+  .hero .row { justify-content: center; }
+
+  .step__n {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.1em;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  /* --- accessibility --- */
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .skip-link {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--action-bg);
+    color: var(--action-ink);
+    border-radius: var(--radius-control);
+    transform: translateY(-200%);
+    z-index: 100;
+  }
+
+  .skip-link:focus { transform: translateY(0); }
+}
+
+/* ---------- 5. utilities ---------- */
+
+/* Use on any element carrying Burmese text that isn't marked lang="my". */
+@utility my {
+  font-family: var(--font-my);
+  line-height: 1.9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows high-contrast mode strips colour; keep structure visible. */
+@media (forced-colors: active) {
+  .card,
+  .field__control,
+  .scale__option span { border: 1px solid CanvasText; }
 }

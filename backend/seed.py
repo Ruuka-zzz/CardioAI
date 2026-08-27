@@ -23,45 +23,60 @@ from database.session import SessionLocal, init_db
 from models import AvailabilitySlot, Doctor, Patient, Role, User
 from services.security import hash_password
 
-ADMIN_EMAIL = "admin@cardioai.local"
+ADMIN_EMAIL = "admin@cardioai.com"
 ADMIN_PASSWORD = "admin-demo-password"
 
 DOCTORS = [
     {
         "full_name": "Dr Khin Myat",
         "specialty": "Cardiology",
+        "hospital": "Yangon General Hospital",
+        "address": "Bogyoke Aung San Rd, Latha, Yangon",
         "bio": "Twelve years in general cardiology, with a focus on heart "
                "failure follow-up and medication review.",
+        "staff_id": "CA-DOC-0001",
         "code": "DEMO-CARD",
-        "email": "khin@cardioai.local",
+        "email": "khin@cardioai.com",
         "password": "doctor-demo-password",
         # Mon/Wed/Fri mornings
-        "slots": [(0, time(9, 0), time(12, 0)),
-                  (2, time(9, 0), time(12, 0)),
-                  (4, time(9, 0), time(12, 0))],
+        # (weekday, from, to, capacity)
+        # Capacity left unset: at 30-minute consultations the slots are the
+        # limit — 9-12 holds exactly 6, and a second ceiling on top of that
+        # would be a rule nobody could observe. Set it only if a doctor wants
+        # to work a full block but see fewer people, e.g. keeping room for
+        # emergencies.
+        "slots": [(0, time(9, 0), time(12, 0), None),
+                  (2, time(9, 0), time(12, 0), None),
+                  (4, time(9, 0), time(12, 0), None)],
     },
     {
         "full_name": "Dr Aung Thura",
         "specialty": "Internal medicine",
+        "hospital": "Victoria Hospital",
+        "address": "No. 68, Taw Win St, Yangon",
         "bio": "Sees patients managing hypertension and diabetes alongside "
                "heart conditions.",
+        "staff_id": "CA-DOC-0002",
         "code": "DEMO-INTM",
-        "email": "aung@cardioai.local",
+        "email": "aung@cardioai.com",
         "password": "doctor-demo-password",
         # Tue/Thu afternoons
-        "slots": [(1, time(13, 0), time(17, 0)),
-                  (3, time(13, 0), time(17, 0))],
+        "slots": [(1, time(13, 0), time(17, 0), None),
+                  (3, time(13, 0), time(17, 0), None)],
     },
     {
         # Left unactivated on purpose, so you can demo the activation flow:
         # sign up at /signup?doctor=1 with the code below.
         "full_name": "Dr Su Mon",
         "specialty": "Cardiology",
+        "hospital": "Yangon General Hospital",
+        "address": "Bogyoke Aung San Rd, Latha, Yangon",
         "bio": "Newly joined. Activation pending.",
+        "staff_id": "CA-DOC-0003",
         "code": "DEMO-NEW1",
         "email": None,
         "password": None,
-        "slots": [(0, time(14, 0), time(17, 0))],
+        "slots": [(0, time(14, 0), time(17, 0), None)],
     },
 ]
 
@@ -90,6 +105,9 @@ def seed_doctor(db, spec: dict) -> None:
         full_name=spec["full_name"],
         specialty=spec["specialty"],
         bio=spec["bio"],
+        hospital=spec["hospital"],
+        address=spec["address"],
+        staff_id=spec["staff_id"],
         activation_code=spec["code"],
         activated=False,
     )
@@ -109,17 +127,18 @@ def seed_doctor(db, spec: dict) -> None:
         doctor.user_id = user.id
         doctor.activated = True
 
-    for weekday, start, end in spec["slots"]:
+    for weekday, start, end, capacity in spec["slots"]:
         db.add(AvailabilitySlot(
-            doctor_id=doctor.id, weekday=weekday, start_time=start, end_time=end
+            doctor_id=doctor.id, weekday=weekday, start_time=start,
+            end_time=end, capacity=capacity,
         ))
 
     db.commit()
 
     if spec["email"]:
-        print(f"  created doctor: {spec['email']} / {spec['password']}")
+        print(f"  {spec['staff_id']}  {spec['email']} / {spec['password']}")
     else:
-        print(f"  created doctor (unactivated), code: {spec['code']}")
+        print(f"  {spec['staff_id']}  unactivated, code: {spec['code']}")
 
 
 def main() -> None:

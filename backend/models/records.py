@@ -23,9 +23,15 @@ class Appointment(Base, IdMixin, TimestampMixin):
     starts_at = Column(DateTime, nullable=False)
     ends_at = Column(DateTime, nullable=False)
     status = Column(
-        Enum(AppointmentStatus), default=AppointmentStatus.requested, nullable=False
+        Enum(AppointmentStatus), default=AppointmentStatus.confirmed, nullable=False
     )
     reason = Column(String, nullable=True)
+
+    # Who cancelled and when. Kept rather than deleting the row: a cancelled
+    # appointment is part of the patient's history, and a pattern of late
+    # cancellations is something a clinic needs to be able to see.
+    cancelled_at = Column(DateTime, nullable=True)
+    cancelled_by = Column(String, nullable=True)  # "patient" | "doctor" 
 
 
 class ConsentRecord(Base, IdMixin):

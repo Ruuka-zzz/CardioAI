@@ -37,12 +37,23 @@ WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
                  "Saturday", "Sunday"]
 
 
+def _slots_in(row) -> int:
+    """How many appointments physically fit in a working-hours block."""
+    minutes = (
+        row.end_time.hour * 60 + row.end_time.minute
+        - row.start_time.hour * 60 - row.start_time.minute
+    )
+    return minutes // settings.appointment_minutes
+
+
 # ---------------------------------------------------------------- schemas
 
 class WorkingHoursRequest(BaseModel):
     weekday: int = Field(ge=0, le=6, description="0 = Monday")
     start_time: time
     end_time: time
+    # Max bookings in this block per day. Leave unset for "as many as fit".
+    capacity: int | None = Field(default=None, ge=1, le=200)
 
     @model_validator(mode="after")
     def end_after_start(self):
@@ -67,12 +78,17 @@ class WorkingHoursResponse(BaseModel):
     weekday_name: str
     start_time: time
     end_time: time
+    capacity: int | None = None
+    # How many slots the block actually yields at the current consultation
+    # length. Shown next to capacity so a doctor can see when the two
+    # disagree — a capacity of 30 on a block holding 4 slots does nothing.
+    slots_in_block: int = 0
 
 
 class CalendarSlot(BaseModel):
     starts_at: datetime
     ends_at: datetime
-    status: Literal["free", "requested", "confirmed"]
+    status: Literal["free", "confirmed"]
     appointment_id: str | None = None
     patient_id: str | None = None
     patient_name: str | None = None
@@ -108,6 +124,8 @@ def my_working_hours(
             weekday_name=WEEKDAY_NAMES[row.weekday],
             start_time=row.start_time,
             end_time=row.end_time,
+            capacity=row.capacity,
+            slots_in_block=_slots_in(row),
         )
         for row in rows
     ]
@@ -144,6 +162,7 @@ def add_working_hours(
         weekday=body.weekday,
         start_time=body.start_time,
         end_time=body.end_time,
+        capacity=body.capacity or settings.default_block_capacity,
     )
     db.add(row)
     db.commit()
@@ -155,6 +174,8 @@ def add_working_hours(
         weekday_name=WEEKDAY_NAMES[row.weekday],
         start_time=row.start_time,
         end_time=row.end_time,
+        capacity=row.capacity,
+        slots_in_block=_slots_in(row),
     )
 
 
@@ -182,9 +203,7 @@ def remove_working_hours(
             Appointment.doctor_id == doctor.id,
             Appointment.starts_at >= datetime.utcnow(),
             Appointment.starts_at <= horizon,
-            Appointment.status.in_(
-                [AppointmentStatus.requested, AppointmentStatus.confirmed]
-            ),
+            Appointment.status == AppointmentStatus.confirmed,
         )
         if appointment.starts_at.weekday() == row.weekday
         and row.start_time <= appointment.starts_at.time() < row.end_time
@@ -229,9 +248,7 @@ def my_calendar(
             Appointment.doctor_id == doctor.id,
             Appointment.starts_at >= now,
             Appointment.starts_at <= horizon,
-            Appointment.status.in_(
-                [AppointmentStatus.requested, AppointmentStatus.confirmed]
-            ),
+            Appointment.status == AppointmentStatus.confirmed,
         )
         .all()
     )

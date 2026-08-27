@@ -27,7 +27,16 @@ class Settings(BaseSettings):
     service_timeout_seconds: float = 10.0
 
     # --- business rules ---
+    # Consultation length. Also decides how many slots a working-hours
+    # block yields — set it to your real consultation time, or the per-block
+    # capacity limit will never bind.
     appointment_minutes: int = 30
+
+    # How far ahead a PATIENT must cancel. Doctors are not held to this.
+    cancellation_notice_hours: int = 2
+
+    # Default ceiling for a new working-hours block. None = as many as fit.
+    default_block_capacity: int | None = None
     availability_horizon_days: int = 14
 
     @property
@@ -38,7 +47,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
-    vapid_public_key: str = ""
-    vapid_private_key: str = ""
-    vapid_subject: str = ""
