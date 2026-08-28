@@ -14,6 +14,7 @@ import DailyCheckIn from "./patient/DailyCheckIn";
 import DoctorDirectory from "./patient/DoctorDirectory";
 import DoctorDashboard from "./doctor/pages/DoctorDashboard";
 import AdminDashboard from "./admin/pages/AdminDashboard";
+import AdminLogin from "./admin/pages/AdminLogin";
 
 import DoctorSchedule from "./doctor/pages/DoctorSchedule";
 import DoctorSignIn from "./doctor/pages/DoctorSignIn";
@@ -35,6 +36,10 @@ export default function App() {
         <Route
           path="/signup"
           element={isSignedIn ? <Navigate to={homeFor(role)} replace /> : <Signup />}
+        />
+        <Route
+          path="/admin-login"
+          element={isSignedIn ? <Navigate to={homeFor(role)} replace /> : <AdminLogin />}
         />
 
         <Route path="/contact" element={<ContactUs />} />

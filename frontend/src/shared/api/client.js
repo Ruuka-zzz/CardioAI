@@ -116,6 +116,7 @@ export const api = {
   adminDoctors: () => request("/admin/doctors"),
   issueDoctorCode: (data) => request("/admin/doctors", { method: "POST", body: data }),
   revokeDoctor: (doctorId) => request(`/admin/doctors/${doctorId}`, { method: "DELETE" }),
+  adminAppointments: () => request("/admin/appointments"),
   auditLog: () => request("/admin/audit-log"),
 
   // ---- visitor chatbot (no auth) ----
@@ -136,5 +137,3 @@ export const api = {
 
 
 };
-
-  

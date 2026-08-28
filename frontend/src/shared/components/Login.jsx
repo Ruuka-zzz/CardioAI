@@ -20,7 +20,10 @@ export default function Login() {
     setBusy(true);
     setError("");
     try {
-      const result = await login(form);
+      const result = await login({
+        email: form.email.trim(),
+        password: form.password,
+      });
       navigate(location.state?.from ?? homeFor(result.role), { replace: true });
     } catch (requestError) {
       setError(requestError.message);
