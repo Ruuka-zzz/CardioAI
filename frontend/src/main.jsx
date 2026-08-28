@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./shared/auth/AuthContext";
-import "./shared/styles/glibal.css";
+import "./shared/styles/global.css";
 import { registerServiceWorker } from "./shared/api/push";
 
 registerServiceWorker();

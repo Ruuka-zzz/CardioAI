@@ -1,14 +1,14 @@
 
 
 /* ============================================================
-   CardioAI — design system on Tailwind v4
+   CardioAI Ã¢â‚¬â€ design system on Tailwind v4
    ============================================================
 
    DIRECTION: "instrument panel."
 
    One organising rule: COLOUR IS SEMANTIC, NEVER DECORATIVE.
    Green, amber and red appear only as condition status. Everything
-   else — buttons, links, chrome — is neutral. That is why there is no
+   else Ã¢â‚¬â€ buttons, links, chrome Ã¢â‚¬â€ is neutral. That is why there is no
    brand colour: a green logo would compete with "condition: good"
    every time they share a screen, and the signal that matters most
    would be the one that got diluted.
@@ -16,8 +16,8 @@
    HOW THEMING WORKS HERE
    Tailwind v4 resolves @theme values at build time, so they cannot
    switch per theme on their own. The fix is two layers:
-     1. raw tokens in :root / [data-theme="dark"]  — these swap
-     2. @theme inline mapping them to Tailwind names — these don't
+     1. raw tokens in :root / [data-theme="dark"]  Ã¢â‚¬â€ these swap
+     2. @theme inline mapping them to Tailwind names Ã¢â‚¬â€ these don't
    `inline` is load-bearing: without it Tailwind copies the value
    instead of the var() reference, and dark mode silently stops working.
 
@@ -28,13 +28,13 @@
    Burmese stacks diacritics above and below the baseline and needs
    ~1.9 line-height or the marks collide. See :lang(my).
    ============================================================ */
-
+@import "tailwindcss";
 /* Drives dark: on [data-theme="dark"]. Also lets you write dark:
    utilities in JSX if a component needs a per-theme tweak. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* ---------- 1. raw tokens (these swap per theme) ---------- */
-@import "tailwindcss";
+
 :root {
   --bg: #f4f6f5;
   --surface: #ffffff;
@@ -67,7 +67,7 @@
 }
 
 [data-theme="dark"] {
-  /* Warm-neutral near-black, not navy — navy plus neon reads as crypto
+  /* Warm-neutral near-black, not navy Ã¢â‚¬â€ navy plus neon reads as crypto
      dashboard, and the warmth is easier on long reading. */
   --bg: #101314;
   --surface: #171b1d;
@@ -142,7 +142,7 @@
     background: var(--bg);
     color: var(--ink);
     font-family: var(--font-sans);
-    font-size: 1.0625rem;        /* 17px — older eyes, phone-first */
+    font-size: 1.0625rem;        /* 17px Ã¢â‚¬â€ older eyes, phone-first */
     line-height: 1.65;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -228,6 +228,11 @@
   }
 
   .shell__main--wide { max-width: var(--container-wide); }
+
+  .shell__main--full {
+    max-width: none;
+    padding: 0;
+  }
 
   /* Bottom nav: twice-daily use, one-handed, sometimes an unsteady grip. */
   .shell__nav {
@@ -317,7 +322,7 @@
 
   /* --- text --- */
 
-  /* Eyebrow with a leading rule — the one piece of ornament in the
+  /* Eyebrow with a leading rule Ã¢â‚¬â€ the one piece of ornament in the
      system. Marks a section start without a heavier heading. */
   .eyebrow {
     display: flex;
@@ -410,7 +415,7 @@
   }
   .btn--quiet:hover:not(:disabled) { color: var(--ink); }
 
-  /* The one place a status colour leaves the status system — because
+  /* The one place a status colour leaves the status system Ã¢â‚¬â€ because
      "this removes something" is itself a warning. */
   .btn--danger {
     background: transparent;
@@ -495,7 +500,7 @@
     margin-top: 0.5rem;
   }
 
-  /* Symptom scale — four full-width targets, not a cramped radio row.
+  /* Symptom scale Ã¢â‚¬â€ four full-width targets, not a cramped radio row.
      The control patients touch most gets the most room. */
   .scale { border: 0; padding: 0; margin: 0 0 2rem; }
 

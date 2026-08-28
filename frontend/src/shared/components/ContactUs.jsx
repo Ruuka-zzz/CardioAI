@@ -1,0 +1,12 @@
+import { Home, Mail, Phone, ShieldAlert } from "lucide-react";
+import { Link } from "react-router-dom";
+
+const SUPPORT_CONTACTS = [
+  { name: "Account support", email: "support@cardioai.example", phone: "+95 9 000 000 001", scope: "Account activation" },
+  { name: "Technical support", email: "tech@cardioai.example", phone: "+95 9 000 000 002", scope: "Technical assistance" },
+  { name: "Security support", email: "security@cardioai.example", phone: "+95 9 000 000 003", scope: "Security concerns" },
+];
+
+export default function ContactUs() {
+  return <section className="min-h-[calc(100dvh-5rem)] bg-[#9bc5bb] p-4 md:p-6"><div className="mx-auto w-full max-w-5xl py-6"><div className="space-y-6 rounded-2xl border border-white/80 bg-white/90 p-6 shadow-xl backdrop-blur-md md:p-8"><div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4"><div><h1 className="text-2xl font-black tracking-tight text-slate-950">Contact CardioAI Support</h1><p className="mt-1 text-sm text-slate-700">For account activation, security concerns, and technical assistance.</p></div><Link to="/" className="flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-teal-300 no-underline hover:bg-slate-800"><Home className="h-4 w-4" />Home</Link></div><div className="grid gap-4 md:grid-cols-3">{SUPPORT_CONTACTS.map((contact) => <article key={contact.email} className="space-y-3 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm"><span className="inline-block rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1 text-[10px] font-bold text-teal-900">{contact.scope}</span><h2 className="text-sm font-bold text-slate-950">{contact.name}</h2><a className="flex items-center gap-1.5 text-xs text-slate-700 hover:text-teal-900" href={`mailto:${contact.email}`}><Mail className="h-3.5 w-3.5 text-teal-700" />{contact.email}</a><p className="flex items-center gap-1.5 text-xs text-slate-700"><Phone className="h-3.5 w-3.5 text-teal-700" />{contact.phone}</p></article>)}</div><div className="flex items-start gap-3 rounded-2xl border border-teal-200 bg-teal-50/90 p-4"><ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-teal-800" /><p className="m-0 text-xs leading-relaxed text-teal-950"><strong>For doctors:</strong> contact support if you need a clinician activation code or account assistance.</p></div></div></div></section>;
+}

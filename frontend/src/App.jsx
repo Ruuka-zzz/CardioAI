@@ -4,6 +4,8 @@ import AppShell from "./shared/components/AppShell";
 import ProtectedRoute from "./shared/components/ProtectedRoute";
 import Login from "./shared/components/Login";
 import Signup from "./shared/components/Signup";
+import ContactUs from "./shared/components/ContactUs";
+import UserProfile from "./shared/components/UserProfile";
 
 import VisitorLanding from "./vistor/pages/VisitorLanding";
 import PatientDashboard from "./patient/PatientDashboard";
@@ -14,6 +16,7 @@ import DoctorDashboard from "./doctor/pages/DoctorDashboard";
 import AdminDashboard from "./admin/pages/AdminDashboard";
 
 import DoctorSchedule from "./doctor/pages/DoctorSchedule";
+import DoctorSignIn from "./doctor/pages/DoctorSignIn";
 
 export default function App() {
   const { isSignedIn, role } = useAuth();
@@ -32,6 +35,12 @@ export default function App() {
         <Route
           path="/signup"
           element={isSignedIn ? <Navigate to={homeFor(role)} replace /> : <Signup />}
+        />
+
+        <Route path="/contact" element={<ContactUs />} />
+        <Route
+          path="/profile"
+          element={<ProtectedRoute allow={["patient"]}><UserProfile /></ProtectedRoute>}
         />
 
         <Route
@@ -67,6 +76,10 @@ export default function App() {
           }
         />
 
+        <Route
+          path="/doctor-login"
+          element={isSignedIn ? <Navigate to={homeFor(role)} replace /> : <DoctorSignIn />}
+        />
         <Route
           path="/doctor"
           element={
