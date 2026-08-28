@@ -64,7 +64,7 @@ DOCTORS = [
         "slots": [(1, time(13, 0), time(17, 0), None),
                   (3, time(13, 0), time(17, 0), None)],
     },
-    {
+    {       
         # Left unactivated on purpose, so you can demo the activation flow:
         # sign up at /signup?doctor=1 with the code below.
         "full_name": "Dr Su Mon",
