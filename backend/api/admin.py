@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from api.deps import require_admin
 from database.session import get_db
-from models import AuditLog, Doctor, Patient, User
-from schemas import AuditEntry, DoctorAdminView, IssueDoctorRequest
+from models import Appointment, AuditLog, Doctor, Patient, User
+from schemas import AdminAppointmentView, AuditEntry, DoctorAdminView, IssueDoctorRequest
 from services.security import generate_activation_code
 
 router = APIRouter(
@@ -91,6 +91,32 @@ def remove_doctor(doctor_id: str, db: Session = Depends(get_db)):
 
     db.commit()
     return {"id": doctor_id, "activated": False}
+
+
+@router.get("/appointments", response_model=list[AdminAppointmentView])
+def list_appointments(limit: int = 100, db: Session = Depends(get_db)):
+    """Operational appointment list for the administration dashboard.
+
+    It exposes names, time and status only; clinical reason and patient record
+    data remain confined to the patient/clinician workflows.
+    """
+    rows = (
+        db.query(Appointment)
+        .order_by(Appointment.starts_at.desc())
+        .limit(min(limit, 500))
+        .all()
+    )
+    return [
+        AdminAppointmentView(
+            id=row.id,
+            patient_name=(db.get(Patient, row.patient_id).full_name if db.get(Patient, row.patient_id) else None),
+            doctor_name=(db.get(Doctor, row.doctor_id).full_name if db.get(Doctor, row.doctor_id) else None),
+            starts_at=row.starts_at,
+            ends_at=row.ends_at,
+            status=row.status.value,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/audit-log", response_model=list[AuditEntry])

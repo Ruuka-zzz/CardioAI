@@ -234,6 +234,14 @@
     padding: 0;
   }
 
+  /* Authentication pages use the complete canvas beneath the header rather
+     than the normal reading-column width. */
+  .shell__main:has(.signup-page),
+  .shell__main:has(.doctor-directory-page) {
+    max-width: none;
+    padding: 0;
+  }
+
   /* Bottom nav: twice-daily use, one-handed, sometimes an unsteady grip. */
   .shell__nav {
     background: color-mix(in srgb, var(--bg) 92%, transparent);

@@ -254,6 +254,20 @@ class AuditEntry(BaseModel):
     occurred_at: datetime
 
 
+class AdminAppointmentView(BaseModel):
+    """Appointment metadata available to administrators.
+
+    This deliberately excludes medical notes and the patient's clinical
+    record. Admins need operational visibility, not clinical-record access.
+    """
+    id: str
+    patient_name: str | None = None
+    doctor_name: str | None = None
+    starts_at: datetime
+    ends_at: datetime
+    status: str
+
+
 # ---------- chatbot ----------
 
 class ChatRequest(BaseModel):

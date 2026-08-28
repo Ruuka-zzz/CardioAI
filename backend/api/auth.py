@@ -1,6 +1,7 @@
 """Signup, login, doctor activation, and the current-user lookup."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.deps import current_user
@@ -18,14 +19,30 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _DUMMY_HASH = hash_password("cardioai-timing-equaliser")
 
 
+def normalise_email(email: str) -> str:
+    """Keep account lookup stable when users vary whitespace or letter case."""
+    return email.strip().lower()
+
+
+def user_for_email(db: Session, email: str | None) -> User | None:
+    if not email:
+        return None
+    return (
+        db.query(User)
+        .filter(func.lower(User.email) == normalise_email(str(email)))
+        .one_or_none()
+    )
+
+
 @router.post("/signup", response_model=TokenResponse, status_code=201)
 def signup(body: SignupRequest, db: Session = Depends(get_db)):
     """Patients only. Doctors go through /doctors/activate."""
-    if db.query(User).filter_by(email=body.email).first():
+    email = normalise_email(str(body.email))
+    if user_for_email(db, email):
         raise HTTPException(status.HTTP_409_CONFLICT, "That email is already registered")
 
     user = User(
-        email=body.email,
+        email=email,
         password_hash=hash_password(body.password),
         role=Role.patient,
     )
@@ -59,11 +76,12 @@ def activate_doctor(body: DoctorActivateRequest, db: Session = Depends(get_db)):
             "That activation code is not valid or has already been used.",
         )
 
-    if db.query(User).filter_by(email=body.email).first():
+    email = normalise_email(str(body.email))
+    if user_for_email(db, email):
         raise HTTPException(status.HTTP_409_CONFLICT, "That email is already registered")
 
     user = User(
-        email=body.email,
+        email=email,
         password_hash=hash_password(body.password),
         role=Role.doctor,
     )
@@ -113,12 +131,12 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             # belong to the same account. Case-insensitive: nobody should be
             # locked out for capitalising their own address.
             if candidate and body.email:
-                if candidate.email.lower() != str(body.email).lower():
+                if candidate.email.lower() != normalise_email(str(body.email)):
                     candidate = None
 
             user = candidate
     else:
-        user = db.query(User).filter_by(email=body.email).one_or_none()
+        user = user_for_email(db, str(body.email) if body.email else None)
 
     password_ok = (
         verify_password(body.password, user.password_hash)

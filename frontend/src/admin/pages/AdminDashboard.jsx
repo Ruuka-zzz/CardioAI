@@ -1,282 +1,48 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Calendar, FileText, Home, Key, LogOut, Trash2, UserCheck } from "lucide-react";
 import { api } from "../../shared/api/client";
-import { Key, FileText, UserX, ShieldCheck, Clock } from "lucide-react";
+import { useAuth } from "../../shared/auth/AuthContext";
 
-/**
- * System administration: issue clinician activation keys, manage doctor
- * accounts, review the record-access audit log.
- *
- * CONTRACT NOTES — each of these broke in the previous version:
- *   - POST /api/admin/doctors takes { full_name, specialty, bio }, NOT an
- *     email. The doctor supplies their own email when redeeming the code.
- *   - The response field is `activation_code`, not `code`.
- *   - Audit entries carry `occurred_at`, not `timestamp`.
- *
- * The generated code is shown once, because the admin passes it to the doctor
- * out of band. GET /admin/doctors withholds codes for already-activated
- * doctors — a spent code on screen is pure risk.
- */
+const inputClass = "bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500";
+const formatDate = (value) => (value ? new Date(value).toLocaleString() : "—");
+const Title = ({ icon: Icon, title, subtitle }) => <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center text-teal-800"><Icon className="w-5 h-5" /></div><div><h2 className="text-sm font-bold text-slate-950">{title}</h2><p className="text-[11px] text-slate-600">{subtitle}</p></div></div>;
+
+/** Operational dashboard backed entirely by the protected admin API. */
 export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [doctors, setDoctors] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [logs, setLogs] = useState([]);
   const [form, setForm] = useState({ full_name: "", specialty: "", bio: "" });
   const [issued, setIssued] = useState(null);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    Promise.all([
-      api.adminDoctors().catch(() => []),
-      api.auditLog().catch(() => []),
-    ])
-      .then(([doctorList, auditLogs]) => {
-        if (cancelled) return;
-        setDoctors(doctorList ?? []);
-        setLogs(auditLogs ?? []);
-      })
-      .finally(() => !cancelled && setLoading(false));
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const set = (field) => (e) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
-    setError("");
+  const refresh = async () => {
+    const [doctorList, bookingList, auditList] = await Promise.all([api.adminDoctors(), api.adminAppointments(), api.auditLog()]);
+    setDoctors(doctorList ?? []); setAppointments(bookingList ?? []); setLogs(auditList ?? []);
   };
-
-  const handleIssue = async (e) => {
-    e.preventDefault();
-
-    if (!form.full_name.trim() || !form.specialty.trim()) {
-      setError("Enter the doctor's name and specialty.");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const created = await api.issueDoctorCode({
-        full_name: form.full_name.trim(),
-        specialty: form.specialty.trim(),
-        bio: form.bio.trim() || null,
-      });
-      setIssued(created);
-      setForm({ full_name: "", specialty: "", bio: "" });
-      setDoctors(await api.adminDoctors());
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+  useEffect(() => { refresh().catch((err) => setError(err.message)).finally(() => setLoading(false)); }, []);
+  const issueKey = async (event) => {
+    event.preventDefault();
+    if (!form.full_name.trim() || !form.specialty.trim()) return setError("Enter the doctor's name and specialty.");
+    setBusy(true); setError("");
+    try { setIssued(await api.issueDoctorCode({ full_name: form.full_name.trim(), specialty: form.specialty.trim(), bio: form.bio.trim() || null })); setForm({ full_name: "", specialty: "", bio: "" }); await refresh(); } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
+  const revoke = async (doctor) => { if (window.confirm(`Disable ${doctor.full_name}'s account?`)) try { await api.revokeDoctor(doctor.id); await refresh(); } catch (err) { setError(err.message); } };
+  const logout = () => { signOut(); navigate("/admin-login", { replace: true }); };
+  if (loading) return <div className="min-h-[calc(100vh-4rem)] bg-[#9bc5bb] p-8 text-xs text-slate-700">Loading administration data…</div>;
 
-  const handleRevoke = async (doctor) => {
-    try {
-      await api.revokeDoctor(doctor.id);
-      setDoctors(await api.adminDoctors());
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-[calc(100vh-4rem)] bg-slate-950 text-slate-400 p-8 text-xs">
-        Loading administration data…
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-[calc(100vh-4rem)] bg-slate-950 text-slate-100 p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div>
-          <h2 className="text-2xl font-bold text-white">System Administration</h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Provider activation, access control &amp; security audit logging
-          </p>
-        </div>
-
-        {error && (
-          <div
-            role="alert"
-            className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs text-rose-300"
-          >
-            {error}
-          </div>
-        )}
-
-        {issued?.activation_code && (
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-6 space-y-2">
-            <p className="text-[10px] font-mono uppercase tracking-wider text-emerald-400">
-              Activation code · shown once
-            </p>
-            <p className="font-mono text-2xl font-bold text-emerald-300 tracking-widest">
-              {issued.activation_code}
-            </p>
-            <p className="text-xs text-slate-300">
-              Send this to {issued.full_name}. It can&apos;t be retrieved later —
-              issue a new one if it&apos;s lost.
-            </p>
-          </div>
-        )}
-
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center gap-2">
-            <Key className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-base font-bold text-white">
-              Issue Clinician Activation Key
-            </h3>
-          </div>
-
-          <p className="text-xs text-slate-400">
-            The doctor supplies their own email when redeeming the code, so none
-            is needed here.
-          </p>
-
-          <form onSubmit={handleIssue} className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                type="text"
-                placeholder="Doctor's full name"
-                value={form.full_name}
-                onChange={set("full_name")}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
-              />
-              <input
-                type="text"
-                placeholder="Specialty"
-                value={form.specialty}
-                onChange={set("specialty")}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
-              />
-            </div>
-
-            <input
-              type="text"
-              placeholder="Short bio (optional) — shown on their public profile"
-              value={form.bio}
-              onChange={set("bio")}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
-            />
-
-            <button
-              type="submit"
-              disabled={busy}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl hover:from-emerald-400 hover:to-teal-300 transition-all disabled:opacity-50"
-            >
-              {busy ? "Generating…" : "Generate Key"}
-            </button>
-          </form>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-          <div className="flex items-center gap-2 mb-6">
-            <ShieldCheck className="w-5 h-5 text-teal-400" />
-            <h3 className="text-base font-bold text-white">Clinician Accounts</h3>
-          </div>
-
-          {doctors.length === 0 ? (
-            <p className="text-slate-500 text-xs">
-              No clinicians yet. Issue a key to get started.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {doctors.map((doctor) => (
-                <div
-                  key={doctor.id}
-                  className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl flex items-center justify-between gap-4"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-200 truncate">
-                      {doctor.full_name}
-                    </p>
-                    <p className="text-[11px] text-slate-500">{doctor.specialty}</p>
-                    {!doctor.activated && doctor.activation_code && (
-                      <p className="text-[11px] font-mono text-amber-400 mt-1 tracking-wider">
-                        {doctor.activation_code}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span
-                      className={
-                        doctor.activated
-                          ? "text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400"
-                          : "text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-full bg-slate-800 text-slate-500"
-                      }
-                    >
-                      {doctor.activated ? "Active" : "Code unused"}
-                    </span>
-
-                    {doctor.activated && (
-                      <button
-                        type="button"
-                        onClick={() => handleRevoke(doctor)}
-                        title="Remove from platform"
-                        className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                      >
-                        <UserX className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-          <div className="flex items-center gap-2 mb-2">
-            <FileText className="w-5 h-5 text-teal-400" />
-            <h3 className="text-base font-bold text-white">
-              Record Access Audit Log
-            </h3>
-          </div>
-          <p className="text-xs text-slate-500 mb-6">
-            Every time a clinician opens a patient record, it is recorded here.
-          </p>
-
-          <div className="space-y-2">
-            {logs.length === 0 ? (
-              <p className="text-slate-500 text-xs">
-                No record accesses logged yet.
-              </p>
-            ) : (
-              logs.slice(0, 25).map((log) => (
-                <div
-                  key={log.id}
-                  className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs flex justify-between items-center gap-4"
-                >
-                  <span className="font-semibold text-slate-300 truncate">
-                    {log.actor_name ?? log.actor_user_id} — {log.action}
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 shrink-0">
-                    <Clock className="w-3 h-3" />
-                    {formatTime(log.occurred_at)}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatTime(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return <div className="min-h-[calc(100vh-4rem)] bg-[#9bc5bb] text-slate-900 p-6 md:p-8 relative overflow-hidden"><div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-white/25 blur-[120px] rounded-full pointer-events-none" /><div className="max-w-5xl mx-auto space-y-6 relative z-10">
+    <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white/85 backdrop-blur-md border border-white/60 p-6 rounded-2xl shadow-md gap-4"><div><h1 className="text-2xl font-black text-slate-950">System Administration Panel</h1><p className="text-xs text-slate-600 mt-1">Manage clinician accounts, activation keys, and system appointments.</p></div><div className="flex gap-3"><button onClick={() => navigate("/")} className="flex items-center gap-2 px-4 py-2 bg-white/80 border border-slate-200 rounded-xl text-xs font-bold"><Home className="w-4 h-4 text-teal-700" />Home</button><button onClick={logout} className="flex items-center gap-2 px-4 py-2 bg-white/80 border border-slate-200 rounded-xl text-xs font-bold text-rose-600"><LogOut className="w-4 h-4" />Sign Out</button></div></header>
+    {error && <p role="alert" className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700">{error}</p>}
+    {issued?.activation_code && <div className="p-4 bg-teal-50 border border-teal-200 rounded-xl text-xs text-teal-900">Activation key for <strong>{issued.full_name}</strong>: <strong className="font-mono text-teal-950">{issued.activation_code}</strong> <span className="ml-2">Save this securely—it is shown once.</span></div>}
+    <section className="bg-white/85 backdrop-blur-md border border-white/60 rounded-2xl p-6 shadow-md space-y-4"><Title icon={Key} title="Issue Clinician Activation Key" subtitle="Generate secure credentials for a new doctor." /><form onSubmit={issueKey} className="grid grid-cols-1 md:grid-cols-3 gap-3"><input required placeholder="Doctor's Full Name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className={inputClass} /><input required placeholder="Specialty (e.g. Cardiology)" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} className={inputClass} /><button disabled={busy} className="py-2.5 bg-slate-900 text-teal-300 font-bold text-xs rounded-xl disabled:opacity-50">{busy ? "Generating…" : "Generate Key"}</button><input placeholder="Short bio (optional)" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} className={`${inputClass} md:col-span-3`} /></form></section>
+    <section className="bg-white/85 backdrop-blur-md border border-white/60 rounded-2xl p-6 shadow-md space-y-4"><Title icon={UserCheck} title="Clinician Accounts" subtitle="Manage registered medical professionals." /><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{doctors.map((doctor) => <article key={doctor.id} className="bg-white/90 border border-slate-200/80 rounded-xl p-4 flex justify-between items-start"><div className="space-y-1 min-w-0"><p className="text-xs font-bold truncate">{doctor.full_name}</p><p className="text-[11px] text-teal-800 font-semibold">{doctor.specialty}</p><span className="text-[10px] px-2 py-0.5 rounded-md bg-teal-50 text-teal-900 border border-teal-200 font-mono">{doctor.activated ? "Active" : "Key Issued"}</span></div>{doctor.activated && <button onClick={() => revoke(doctor)} title="Disable account" className="p-2 text-slate-400 hover:text-rose-600 bg-white border border-slate-200 rounded-xl"><Trash2 className="w-4 h-4" /></button>}</article>)}{!doctors.length && <p className="text-xs text-slate-600">No clinicians have been added yet.</p>}</div></section>
+    <section className="bg-white/85 backdrop-blur-md border border-white/60 rounded-2xl p-6 shadow-md space-y-4"><div className="flex items-center justify-between"><Title icon={Calendar} title="System Bookings & Appointments" subtitle="Operational view only; clinical data remains protected." /><span className="text-xs bg-teal-50 text-teal-900 border border-teal-200 px-3 py-1 rounded-full font-mono">Total: {appointments.length}</span></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{appointments.map((item) => <article key={item.id} className="bg-white/90 border border-slate-200/80 rounded-xl p-4 space-y-1.5"><div className="flex justify-between gap-2"><strong className="text-xs">Patient: {item.patient_name ?? "Unknown"}</strong><span className="text-[10px] bg-teal-50 text-teal-900 px-2 py-0.5 rounded-md border border-teal-200 font-mono">{item.status}</span></div><p className="text-[11px] text-teal-800 font-semibold">Doctor: {item.doctor_name ?? "Unknown"}</p><p className="text-[11px] text-slate-600 font-mono">{formatDate(item.starts_at)}</p></article>)}</div>{!appointments.length && <p className="text-xs text-slate-600">No appointments yet.</p>}</section>
+    <section className="bg-white/85 backdrop-blur-md border border-white/60 rounded-2xl p-6 shadow-md space-y-4"><Title icon={FileText} title="Record Access Audit Log" subtitle="Latest clinician access events." />{logs.slice(0, 10).map((log) => <div key={log.id} className="text-xs bg-white/80 border border-slate-200 rounded-xl p-3 flex justify-between gap-3"><span>{log.actor_name ?? log.actor_user_id} — {log.action}</span><span className="text-slate-500">{formatDate(log.occurred_at)}</span></div>)}{!logs.length && <p className="text-xs text-slate-600">No record accesses logged yet.</p>}</section>
+  </div></div>;
 }
