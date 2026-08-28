@@ -1,4 +1,4 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 const NAV_BY_ROLE = {
@@ -22,11 +22,14 @@ const NAV_BY_ROLE = {
  */
 export default function AppShell({ children }) {
   const { role, isSignedIn, signOut } = useAuth();
+  const { pathname } = useLocation();
+  const isLanding = pathname === "/";
+  const isFullWidth = ["/", "/contact", "/profile", "/login", "/doctor-login"].includes(pathname);
   const links = NAV_BY_ROLE[role] ?? [];
 
   return (
     <div className="shell">
-      <header className="shell__bar">
+      {!isLanding && <header className="shell__bar">
         <div className="shell__bar-inner">
           <Link to="/" className="wordmark">
             <Pulse />
@@ -38,9 +41,9 @@ export default function AppShell({ children }) {
             </button>
           )}
         </div>
-      </header>
+      </header>}
 
-      <main className="shell__main">{children}</main>
+      <main className={isFullWidth ? "shell__main shell__main--full" : "shell__main"}>{children}</main>
 
       {isSignedIn && links.length > 1 && (
         <nav className="shell__nav" aria-label="Main">
