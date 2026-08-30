@@ -2,41 +2,77 @@
 
     uvicorn main:app --reload --port 8002
 
-Contract is fixed by backend/services/clients.py:run_triage —
-POST /triage takes {symptoms, medication_taken, baseline_risk} and returns
-{status, urgency, recommendation, fired_rules, score}.
+Contract is fixed by backend/services/clients.py:run_triage — POST /triage
+takes symptoms, trigger, vitals, medication, baseline and history, and
+returns status, urgency, recommendation, fired_rules, score, nyha_class.
 """
 
 import logging
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
-from typing import Literal
 
 import engine
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="CardioAI Prolog Engine", version="0.1.0")
+app = FastAPI(title="CardioAI Prolog Engine", version="0.2.0")
 
 _ready = False
 
 
 class Symptoms(BaseModel):
-    """All five are required, including zeros — see facts_template.pl."""
+    """All six always sent, including the false ones — the rules use \\+ and
+    findall over symptom/2, so a missing key changes the meaning of a query."""
 
-    chest_pain: int = Field(ge=0, le=3)
-    breathlessness: int = Field(ge=0, le=3)
-    fatigue: int = Field(ge=0, le=3)
-    swelling: int = Field(ge=0, le=3)
-    dizziness: int = Field(ge=0, le=3)
+    chest_pain: bool = False
+    breathlessness: bool = False
+    breathlessness_trigger: Literal["none", "stairs", "walking", "at_rest"] = "none"
+    dizziness: bool = False
+    fatigue: bool = False
+    palpitations: bool = False
+    swelling: bool = False
+
+
+class Vitals(BaseModel):
+    """All optional. Not every patient owns a monitor, and a missing reading
+    must never be filled in with a default — a rule firing on an invented
+    number is worse than a rule that doesn't fire."""
+
+    systolic_bp: int | None = Field(default=None, ge=40, le=300)
+    diastolic_bp: int | None = Field(default=None, ge=20, le=200)
+    heart_rate: int | None = Field(default=None, ge=20, le=250)
+    temperature_c: float | None = Field(default=None, ge=25, le=45)
+
+
+class Medication(BaseModel):
+    taken: bool = True
+    missed: bool = False
+    extra: bool = False
+
+
+class History(BaseModel):
+    """Diagnosed conditions from the baseline. Only the true ones become
+    Prolog facts — absence means no diagnosis."""
+
+    hypertension: bool = False
+    diabetes: bool = False
+    ischemic_heart_disease: bool = False
+    heart_failure: bool = False
+    heart_attack: bool = False
+    stroke: bool = False
+    valve_disease: bool = False
 
 
 class TriageRequest(BaseModel):
     symptoms: Symptoms
-    medication_taken: bool
+    worse_than_usual: bool = False
+    vitals: Vitals = Vitals()
+    medication: Medication = Medication()
     baseline_risk: Literal["low", "medium", "high"]
+    history: History = History()
 
 
 class TriageResponse(BaseModel):
@@ -45,6 +81,8 @@ class TriageResponse(BaseModel):
     recommendation: str
     fired_rules: list[str]
     score: float
+    # NYHA functional class, or null when no breathlessness was reported.
+    nyha_class: int | None = None
 
 
 @app.on_event("startup")
@@ -72,11 +110,18 @@ def triage(body: TriageRequest):
             "Prolog engine is not available. Check SWI-Prolog is installed.",
         )
 
+    symptoms = body.symptoms.model_dump()
+    trigger = symptoms.pop("breathlessness_trigger")
+
     try:
         result = engine.run_triage(
-            symptoms=body.symptoms.model_dump(),
-            medication_taken=body.medication_taken,
+            symptoms=symptoms,
+            breathlessness_trigger=trigger,
+            worse_than_usual=body.worse_than_usual,
+            vitals=body.vitals.model_dump(),
+            medication=body.medication.model_dump(),
             baseline=body.baseline_risk,
+            history=body.history.model_dump(),
         )
     except engine.PrologUnavailable as err:
         log.exception("Triage failed")
@@ -88,4 +133,5 @@ def triage(body: TriageRequest):
         recommendation=result.recommendation,
         fired_rules=result.fired_rules,
         score=result.score,
+        nyha_class=result.nyha_class,
     )

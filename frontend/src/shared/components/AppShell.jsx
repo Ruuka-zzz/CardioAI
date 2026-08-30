@@ -2,9 +2,10 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 const NAV_BY_ROLE = {
-  patient: [
+    patient: [
     { to: "/patient", label: "Today", end: true },
     { to: "/patient/check-in", label: "Check in" },
+    { to: "/patient/records", label: "Records" },
     { to: "/patient/doctors", label: "Doctors" },
   ],
   doctor: [{ to: "/doctor", label: "Patients", end: true },

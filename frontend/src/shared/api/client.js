@@ -135,5 +135,11 @@ export const api = {
     request(`/doctor/availability/${id}`, { method: "DELETE" }),
   myCalendar: () => request("/doctor/calendar"),
 
+  myBaseline: () => request("/patients/me/baseline"),
+  myDoctors: () => request("/patients/me/doctors"),
+  myAppointments: ({ includePast = false } = {}) =>
+    request(`/appointments?include_past=${includePast}`),
+  cancelAppointment: (id) =>
+    request(`/appointments/${id}/cancel`, { method: "POST", body: {} }),
 
 };

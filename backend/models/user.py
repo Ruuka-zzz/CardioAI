@@ -48,8 +48,19 @@ class Patient(Base, IdMixin, TimestampMixin):
     push_subscription = Column(JSON, nullable=True)    # Web Push endpoint + keys
 
     user = relationship("User", back_populates="patient")
-    medical_record = relationship("MedicalRecord", back_populates="patient", uselist=False)
-    family_history = relationship("FamilyHistory", back_populates="patient")
+
+    # All four baseline categories are one-per-patient. family_history used to
+    # be a list (one row per relative); the questionnaire asks "does anyone in
+    # your family...", so a single row of flags is what it actually collects.
+    medical_record = relationship("MedicalRecord", back_populates="patient",
+                                  uselist=False)
+    family_history = relationship("FamilyHistory", back_populates="patient",
+                                  uselist=False)
+    lifestyle = relationship("LifestyleHistory", back_populates="patient",
+                             uselist=False)
+    medications = relationship("MedicationHistory", back_populates="patient",
+                               uselist=False)
+
     checkins = relationship("DailyCheckIn", back_populates="patient")
 
 
@@ -72,6 +83,13 @@ class Doctor(Base, IdMixin, TimestampMixin):
 
     full_name = Column(String, nullable=False)
     specialty = Column(String, nullable=False)
+
+    # Degrees and postgraduate qualifications, e.g. "MBBS, MRCP (UK)".
+    # Free text rather than a controlled list: Myanmar, UK and regional
+    # qualifications don't share a vocabulary, and forcing one would either
+    # exclude valid credentials or invite wrong ones.
+    qualifications = Column(String, nullable=True)
+
     bio = Column(String, nullable=True)
 
     # Where the patient physically goes. Shown in the directory — a patient

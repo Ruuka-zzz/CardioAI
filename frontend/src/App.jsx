@@ -18,6 +18,7 @@ import AdminLogin from "./admin/pages/AdminLogin";
 
 import DoctorSchedule from "./doctor/pages/DoctorSchedule";
 import DoctorSignIn from "./doctor/pages/DoctorSignIn";
+import PatientRecords from "./patient/PatientRecords";
 
 export default function App() {
   const { isSignedIn, role } = useAuth();
@@ -81,6 +82,7 @@ export default function App() {
           }
         />
 
+
         <Route
           path="/doctor-login"
           element={isSignedIn ? <Navigate to={homeFor(role)} replace /> : <DoctorSignIn />}
@@ -90,6 +92,14 @@ export default function App() {
           element={
             <ProtectedRoute allow={["doctor"]}>
               <DoctorDashboard />
+            </ProtectedRoute>
+          }
+        />
+                <Route
+          path="/patient/records"
+          element={
+            <ProtectedRoute allow={["patient"]}>
+              <PatientRecords />
             </ProtectedRoute>
           }
         />

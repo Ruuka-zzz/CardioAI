@@ -51,3 +51,18 @@ def generate_activation_code() -> str:
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     blocks = ["".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(2)]
     return "-".join(blocks)
+
+def generate_staff_id(sequence: int) -> str:
+    """Permanent, human-readable doctor number: CA-DOC-0001.
+
+    This is an IDENTIFIER, not a secret. It appears on the doctor's dashboard,
+    in the admin list, and can be quoted over the phone. Keep it strictly
+    separate from the activation code — merging the two would mean the number
+    printed on screen is also the credential that claims the account.
+
+    Sequential rather than random: an admin reading a list of doctors should
+    be able to see at a glance who joined first, and a gap is a signal worth
+    investigating. Callers pass the next sequence number; the database's
+    unique constraint is what actually guarantees no collision.
+    """
+    return f"CA-DOC-{sequence:04d}"
