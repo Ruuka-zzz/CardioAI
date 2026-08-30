@@ -74,15 +74,9 @@ DOCTORS = [
         "bio": "Newly joined. Activation pending.",
         "staff_id": "CA-DOC-0003",
         "code": "DEMO-NEW1",
-<<<<<<< Updated upstream
         "email": None,
         "password": None,
         "slots": [(0, time(14, 0), time(17, 0), None)],
-=======
-        "email": "su@cardioai.local",
-        "password": "doctor-demo-password",
-        "slots": [(0, time(14, 0), time(17, 0))],
->>>>>>> Stashed changes
     },
 ]
 

@@ -1,33 +1,36 @@
 {
-  "trained_at": "2026-08-26T02:10:00.151886",
-  "rows_used": 297,
-  "cv_roc_auc_mean": 0.9058361638361638,
-  "cv_roc_auc_std": 0.05724108991544632,
-  "test_accuracy": 0.8166666666666667,
-  "test_roc_auc": 0.9419642857142857,
+  "model_version": "cardio_hgb_v1",
+  "trained_at": "2026-08-30T06:16:34.714084+00:00",
+  "rows_used": 64790,
+  "cv_roc_auc_mean": 0.7871715560232144,
+  "cv_roc_auc_std": 0.0035113862474103275,
+  "test_accuracy": 0.7211761074239852,
+  "test_roc_auc": 0.7888287081095261,
   "confusion_matrix": [
     [
-      28,
-      4
+      4754,
+      1612
     ],
     [
-      7,
-      21
+      2001,
+      4591
     ]
   ],
   "feature_order": [
     "age",
-    "sex",
-    "cp",
-    "trestbps",
-    "chol",
-    "fbs",
-    "restecg",
-    "thalach",
-    "exang",
-    "oldpeak",
-    "slope",
-    "ca",
-    "thal"
-  ]
+    "gender",
+    "height_cm",
+    "weight_kg",
+    "systolic_bp",
+    "diastolic_bp",
+    "bmi",
+    "pulse_pressure",
+    "smokes",
+    "drinks_alcohol",
+    "physically_active"
+  ],
+  "thresholds": {
+    "medium": 0.34,
+    "high": 0.64
+  }
 }

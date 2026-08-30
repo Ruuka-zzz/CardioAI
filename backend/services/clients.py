@@ -24,7 +24,7 @@ import httpx
 from fastapi import HTTPException, status
 
 from config import get_settings
-from models import DailyCheckIn, MedicalRecord, RiskLevel, Urgency
+from models import RiskLevel, Urgency
 
 log = logging.getLogger(__name__)
 settings = get_settings()
@@ -38,22 +38,30 @@ def _client() -> httpx.Client:
 
 # ---------------------------------------------------------------- ml-service
 
-def assess_baseline_risk(record: MedicalRecord) -> dict:
-    """POST /predict -> {"risk_level", "score"}. Runs at onboarding only."""
+def assess_baseline_risk(age, sex, record, lifestyle) -> dict:
+    """POST /predict -> {"risk_level", "score"}. Runs at onboarding only.
+
+    The payload changed with the new questionnaire. The old UCI feature set
+    needed an ECG, a stress test and a blood panel — values a patient cannot
+    self-report — so the model is being retrained on a dataset built from
+    things they can: age, sex, height, weight, blood pressure, smoking,
+    alcohol and activity. See ml-service/README.md.
+
+    Family history, prior diagnoses and medication are NOT sent. No dataset
+    we have contains them, so inventing a column would mean feeding the model
+    a feature it was never trained on. They go to the Prolog rules instead,
+    and surface to the patient through `risk_factors`.
+    """
     payload = {
-        "age": record.age,
-        "sex": 1 if record.sex == "male" else 0,
-        "cp": record.chest_pain_type,
-        "trestbps": record.resting_bp,
-        "chol": record.cholesterol,
-        "fbs": int(record.fasting_bs_high),
-        "restecg": record.resting_ecg,
-        "thalach": record.max_heart_rate,
-        "exang": int(record.exercise_angina),
-        "oldpeak": record.oldpeak,
-        "slope": record.st_slope,
-        "ca": record.major_vessels,
-        "thal": record.thalassemia,
+        "age": age,
+        "gender": 1 if sex == "male" else 0,
+        "height_cm": record.height_cm,
+        "weight_kg": record.weight_kg,
+        "systolic_bp": record.systolic_bp,
+        "diastolic_bp": record.diastolic_bp,
+        "smokes": int(lifestyle.smokes_now),
+        "drinks_alcohol": int(lifestyle.drinks_alcohol),
+        "physically_active": int(lifestyle.physical_activity.value != "low"),
     }
 
     try:
@@ -73,23 +81,63 @@ def assess_baseline_risk(record: MedicalRecord) -> dict:
 
 # ------------------------------------------------------------- prolog-engine
 
-def run_triage(checkin: DailyCheckIn, baseline: RiskLevel) -> dict:
+def _history_of(patient) -> dict:
+    """Diagnosed conditions, as flags. Empty when the baseline is missing —
+    the rules treat absence as "no diagnosis", which is the correct reading
+    of a patient who hasn't told us otherwise."""
+    record = patient.medical_record
+    if record is None:
+        return {}
+    return {
+        "hypertension": record.hypertension,
+        "diabetes": record.diabetes,
+        "ischemic_heart_disease": record.ischemic_heart_disease,
+        "heart_failure": record.heart_failure,
+        "heart_attack": record.heart_attack,
+        "stroke": record.stroke,
+        "valve_disease": record.valve_disease.value == "yes",
+    }
+
+
+def run_triage(checkin, patient) -> dict:
     """POST /triage -> status, urgency, recommendation, fired_rules, score.
 
+    Symptoms are now booleans plus a breathlessness trigger, which is the NYHA
+    class in plain language. Vitals are optional — not every patient owns a
+    monitor — so the rulebase must cope with them being absent rather than
+    assume a number.
+
     fired_rules is the reason triage is rule-based rather than a model: the
-    patient is shown exactly which rules produced their result. If it comes
-    back empty, that's a bug in the rulebase, not a valid answer.
+    patient is shown exactly which rules produced their result. An empty list
+    is a bug in the rulebase, not a valid answer.
     """
     payload = {
         "symptoms": {
             "chest_pain": checkin.chest_pain,
             "breathlessness": checkin.breathlessness,
-            "fatigue": checkin.fatigue,
-            "swelling": checkin.swelling,
+            "breathlessness_trigger": checkin.breathlessness_trigger.value,
             "dizziness": checkin.dizziness,
+            "fatigue": checkin.fatigue,
+            "palpitations": checkin.palpitations,
+            "swelling": checkin.swelling,
         },
-        "medication_taken": checkin.medication_taken,
-        "baseline_risk": baseline.value,
+        "worse_than_usual": checkin.worse_than_usual,
+        "vitals": {
+            "systolic_bp": checkin.systolic_bp,
+            "diastolic_bp": checkin.diastolic_bp,
+            "heart_rate": checkin.heart_rate,
+            "temperature_c": checkin.temperature_c,
+        },
+        "medication": {
+            "taken": checkin.medication_taken,
+            "missed": checkin.medication_missed,
+            "extra": checkin.extra_medication,
+        },
+        "baseline_risk": patient.baseline_risk.value,
+        # Diagnosed conditions change what a symptom means. Ankle swelling in
+        # someone with heart failure is a different event from ankle swelling
+        # in someone without, and the rules need to be able to tell.
+        "history": _history_of(patient),
     }
 
     try:

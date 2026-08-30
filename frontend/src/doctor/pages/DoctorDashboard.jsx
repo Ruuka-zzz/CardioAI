@@ -178,23 +178,30 @@ export default function DoctorDashboard() {
                   className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl flex items-center justify-between gap-4"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-200 truncate">
-                      {patient.full_name}
-                    </p>
-                    <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                      {patient.record_shared ? (
-                        <>
-                          <Unlock className="w-3 h-3 text-emerald-400" />
-                          Record shared with you
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="w-3 h-3" />
-                          Record private
-                        </>
-                      )}
-                    </p>
-                  </div>
+  <p className="text-sm font-semibold text-slate-200 truncate">
+    {patient.full_name}
+  </p>
+
+  {patient.age && (
+    <p className="text-xs text-slate-400 mt-0.5">
+      {patient.age} · {patient.sex}
+    </p>
+  )}
+
+  <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+    {patient.record_shared ? (
+      <>
+        <Unlock className="w-3 h-3 text-emerald-400" />
+        Record shared with you
+      </>
+    ) : (
+      <>
+        <Lock className="w-3 h-3" />
+        Record private
+      </>
+    )}
+  </p>
+</div>
 
                   <button
                     type="button"
@@ -236,9 +243,15 @@ export default function DoctorDashboard() {
                 <p className="text-[10px] font-mono uppercase tracking-wider text-amber-400">
                   Medical record · this access has been logged
                 </p>
-                <h3 className="text-lg font-bold text-white mt-1">
-                  {record.full_name}
-                </h3>
+                <h2 className="text-lg font-bold text-white mt-1">
+  {record.full_name}
+</h2>
+
+<p className="row" style={{ gap: "0.5rem" }}>
+  {record.age && <span className="pill">{record.age} years</span>}
+  {record.sex && <span className="pill">{record.sex}</span>}
+  {record.bmi && <span className="pill">BMI {record.bmi}</span>}
+</p>
                 <p className="text-xs text-slate-400 mt-1">
                   Baseline risk:{" "}
                   <span className="font-mono text-slate-200">

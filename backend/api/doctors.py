@@ -21,11 +21,11 @@ from config import get_settings
 from database.session import get_db
 from models import (
     Appointment, AppointmentStatus, AvailabilitySlot, ConsentRecord,
-    DailyCheckIn, Doctor, FamilyHistory, Patient,
+    DailyCheckIn, Doctor, Patient,
 )
 from schemas import (
     AppointmentRequest, AppointmentResponse, CancelRequest, CheckInSummary,
-    ConsentRequest, ConsentResponse, DoctorPublic, FamilyHistoryEntry,
+    ConsentRequest, ConsentResponse, DoctorPublic, MyDoctorResponse,
     PatientRecordResponse, PatientSummary, SlotOption,
 )
 from services import booking as booking_rules
@@ -39,6 +39,24 @@ WEEKDAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
 # ---------------------------------------------------------------- helpers
+
+def _columns_of(row) -> dict | None:
+    """Every column except the plumbing, as a plain dict.
+
+    Enum values are unwrapped so the response is JSON rather than Python
+    objects. Used for the four baseline tables, which the doctor sees as-is
+    once consent is granted.
+    """
+    if row is None:
+        return None
+    out = {}
+    for column in row.__table__.columns:
+        if column.name in {"id", "patient_id", "created_at"}:
+            continue
+        value = getattr(row, column.name)
+        out[column.name] = value.value if hasattr(value, "value") else value
+    return out
+
 
 def _age_from(dob: date | None) -> int | None:
     if dob is None:
@@ -191,6 +209,64 @@ def cancel_as_patient(
     return _to_response(db, appointment, for_doctor=False)
 
 
+@router.get("/patients/me/doctors", response_model=list[MyDoctorResponse])
+def my_doctors(
+    db: Session = Depends(get_db),
+    patient: Patient = Depends(current_patient),
+):
+    """Doctors this patient actually has a relationship with.
+
+    "Relationship" means one of two things, and both count: they have booked
+    an appointment, or they have shared their record. A patient who shared
+    their history and then cancelled the appointment still needs to see that
+    doctor listed — otherwise the only place their consent is visible is a
+    page they have no reason to revisit.
+
+    Different from GET /doctors, which is the public directory.
+    """
+    booked = (
+        db.query(Appointment)
+        .filter_by(patient_id=patient.id)
+        .order_by(Appointment.starts_at)
+        .all()
+    )
+
+    ids = {a.doctor_id for a in booked}
+    ids |= {g.doctor_id for g in consent_service.list_grants(db, patient.id)}
+
+    now = datetime.utcnow()
+    out: list[MyDoctorResponse] = []
+
+    for doctor_id in ids:
+        doctor = db.get(Doctor, doctor_id)
+        if doctor is None:
+            continue
+
+        mine = [a for a in booked if a.doctor_id == doctor_id]
+        upcoming = [
+            a for a in mine
+            if a.status is AppointmentStatus.confirmed and a.starts_at >= now
+        ]
+
+        out.append(MyDoctorResponse(
+            id=doctor.id,
+            staff_id=doctor.staff_id,
+            full_name=doctor.full_name,
+            specialty=doctor.specialty,
+            qualifications=doctor.qualifications,
+            hospital=doctor.hospital,
+            address=doctor.address,
+            bio=doctor.bio,
+            working_days=_working_days(db, doctor.id),
+            record_shared=consent_service.active_grant(db, patient.id, doctor.id)
+            is not None,
+            appointment_count=len(mine),
+            next_appointment=upcoming[0].starts_at if upcoming else None,
+        ))
+
+    return sorted(out, key=lambda d: d.full_name)
+
+
 # ---------------------------------------------------------------- consent
 
 @router.get("/consents", response_model=list[ConsentResponse])
@@ -261,6 +337,8 @@ def connected_patients(
         out.append(PatientSummary(
             id=patient.id,
             full_name=patient.full_name,
+            age=_age_from(patient.date_of_birth),
+            sex=patient.sex,
             record_shared=consent_service.active_grant(db, patient.id, doctor.id)
             is not None,
         ))
@@ -332,26 +410,19 @@ def read_patient_record(
         .all()
     )
 
-    record = patient.medical_record
-    history = db.query(FamilyHistory).filter_by(patient_id=patient_id).all()
-
     return PatientRecordResponse(
         patient_id=patient.id,
         full_name=patient.full_name,
+        # Age is derived from date of birth rather than stored, so it can
+        # never be stale — a stored age is wrong from the next birthday on.
+        age=_age_from(patient.date_of_birth),
+        sex=patient.sex,
         baseline_risk=patient.baseline_risk.value if patient.baseline_risk else None,
-        medical_record={
-            c.name: getattr(record, c.name)
-            for c in record.__table__.columns
-            if c.name not in {"id", "patient_id"}
-        } if record else None,
-        family_history=[
-            FamilyHistoryEntry(
-                relation=h.relation,
-                condition=h.condition,
-                age_at_diagnosis=h.age_at_diagnosis,
-            )
-            for h in history
-        ],
+        bmi=patient.medical_record.bmi if patient.medical_record else None,
+        medical_record=_columns_of(patient.medical_record),
+        family_history=_columns_of(patient.family_history),
+        lifestyle=_columns_of(patient.lifestyle),
+        medication=_columns_of(patient.medications),
         recent_checkins=[
             CheckInSummary(
                 date=c.check_date.isoformat(),

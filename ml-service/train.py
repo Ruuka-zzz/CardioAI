@@ -1,62 +1,79 @@
 """Train the baseline risk model.
 
-    python train.py                          # uses data/heart.csv
-    python train.py --data path/to/heart.csv
+    python train.py                       # uses data/cardio_train.csv
+    python train.py --data path/to.csv
 
-Writes a fitted pipeline to model/uci_heart_rf.joblib plus a metrics JSON
-alongside it. Both are gitignored — the artifact is reproducible from this
-script, and a binary in git is a merge conflict waiting to happen.
+Writes a bundle to model/baseline_risk.joblib containing the fitted pipeline,
+the feature order, and the risk thresholds. All three travel together on
+purpose: a pipeline loaded next to the wrong feature order or the wrong
+thresholds produces confident nonsense, and nothing errors.
 
-Run this once before starting the service. predict.py refuses to start
-without the artifact rather than serving a fallback, because a made-up
-baseline risk is worse than a clear error.
+WHY THIS MODEL
+HistGradientBoostingClassifier. At 70,000 rows of mixed binary and continuous
+features it beats a random forest on both accuracy and training time, and it
+ships inside scikit-learn — no extra dependency for the team to install.
+
+WHY THE THRESHOLDS ARE LEARNED, NOT FIXED
+The source dataset is roughly balanced, so predicted probabilities cluster
+near 0.5. Hard-coded cut points of 0.35 and 0.65 would put almost every
+patient in "medium" and the band would tell them nothing. Instead the
+tertiles of the training distribution become the cut points, so low, medium
+and high each mean "compared with everyone else in the data".
+
+That is a product decision about how to present risk, not a claim about
+clinical severity — and it is why the bands are words rather than a
+percentage. The dataset's target is "does this person have cardiovascular
+disease", not "will they develop it", so a percentage here would read as a
+diagnosis. It isn't one.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
-from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
+import numpy as np
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import (
     accuracy_score, classification_report, confusion_matrix, roc_auc_score,
 )
 from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from preprocess import FEATURE_ORDER, clean, load_raw, split_xy
+from preprocess import (
+    FEATURE_ORDER, TARGET, clean, load_raw, normalise_columns, split_xy,
+)
 
-# cp, restecg, slope, ca, thal are categories despite being stored as numbers.
-# Left as integers the model would read "thal=3" as greater than "thal=1",
-# which is meaningless for a test-result category.
-CATEGORICAL = ["cp", "restecg", "slope", "ca", "thal"]
-NUMERIC = [c for c in FEATURE_ORDER if c not in CATEGORICAL]
-
-DEFAULT_DATA = Path("data/heart.csv")
-MODEL_PATH = Path("model/uci_heart_rf.joblib")
+DEFAULT_DATA = Path("data/cardio_train.csv")
+MODEL_PATH = Path("model/baseline_risk.joblib")
 METRICS_PATH = Path("model/metrics.json")
 
+MODEL_VERSION = "cardio_hgb_v1"
 
-def build_pipeline() -> Pipeline:
-    preprocessor = ColumnTransformer([
-        ("num", StandardScaler(), NUMERIC),
-        ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL),
-    ])
 
-    classifier = RandomForestClassifier(
-        n_estimators=300,
-        max_depth=6,          # shallow: ~300 rows overfits fast
-        min_samples_leaf=5,
-        class_weight="balanced",
+def build_model() -> HistGradientBoostingClassifier:
+    return HistGradientBoostingClassifier(
+        max_iter=300,
+        learning_rate=0.08,
+        max_depth=6,
+        min_samples_leaf=40,      # 70k rows — keeps leaves meaningful
+        l2_regularization=1.0,
+        early_stopping=True,
+        validation_fraction=0.1,
         random_state=42,
     )
 
-    return Pipeline([("prep", preprocessor), ("clf", classifier)])
+
+def learn_thresholds(probabilities: np.ndarray) -> dict[str, float]:
+    """Tertiles of the training distribution become the band boundaries.
+
+    Rounded to two decimals so the saved numbers are readable in metrics.json
+    — the rounding is cosmetic and shifts nobody's band in practice.
+    """
+    medium, high = np.percentile(probabilities, [33.3, 66.7])
+    return {"medium": round(float(medium), 2), "high": round(float(high), 2)}
 
 
 def main() -> None:
@@ -69,31 +86,55 @@ def main() -> None:
     if not data_path.exists():
         raise SystemExit(
             f"No dataset at {data_path}. See ml-service/data/README.md for "
-            "where to download the UCI Heart Disease CSV."
+            "where to download it."
         )
 
-    df = clean(load_raw(str(data_path)))
+    print(f"Reading {data_path}...")
+    df = clean(normalise_columns(load_raw(str(data_path))))
+
+    if TARGET not in df.columns:
+        raise SystemExit(
+            f"No '{TARGET}' column. Check you downloaded the right file — "
+            "see data/README.md for the expected columns."
+        )
+
     X, y = split_xy(df)
-    print(f"Training on {len(df)} rows ({y.sum()} positive, {len(y) - y.sum()} negative)")
+    positive = int(y.sum())
+    print(f"Training on {len(df)} rows ({positive} positive, "
+          f"{len(y) - positive} negative)")
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=args.test_size, stratify=y, random_state=42
     )
 
-    pipeline = build_pipeline()
+    model = build_model()
 
-    # Cross-validate before the final fit. With a dataset this small, a single
-    # train/test split is noisy enough to be misleading on its own.
-    cv_scores = cross_val_score(pipeline, X_train, y_train, cv=5, scoring="roc_auc")
-    print(f"5-fold CV ROC-AUC: {cv_scores.mean():.3f} (+/- {cv_scores.std():.3f})")
+    # Cross-validate before the final fit. A single split on 70k rows is less
+    # noisy than on 300, but a fold-to-fold spread still tells you whether the
+    # headline number is stable.
+    cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring="roc_auc")
+    print(f"5-fold CV ROC-AUC: {cv_scores.mean():.3f} "
+          f"(+/- {cv_scores.std():.3f})")
 
-    pipeline.fit(X_train, y_train)
+    model.fit(X_train, y_train)
 
-    predictions = pipeline.predict(X_test)
-    probabilities = pipeline.predict_proba(X_test)[:, 1]
+    predictions = model.predict(X_test)
+    probabilities = model.predict_proba(X_test)[:, 1]
+
+    # Thresholds come from the TRAINING split only. Deriving them from the
+    # test set would leak information the model isn't supposed to have seen.
+    train_probabilities = model.predict_proba(X_train)[:, 1]
+    thresholds = learn_thresholds(train_probabilities)
+
+    print("\n" + classification_report(
+        y_test, predictions, target_names=["no disease", "disease"]
+    ))
+    print(f"Risk bands: low < {thresholds['medium']} "
+          f"<= medium < {thresholds['high']} <= high")
 
     metrics = {
-        "trained_at": datetime.utcnow().isoformat(),
+        "model_version": MODEL_VERSION,
+        "trained_at": datetime.now(timezone.utc).isoformat(),
         "rows_used": int(len(df)),
         "cv_roc_auc_mean": float(cv_scores.mean()),
         "cv_roc_auc_std": float(cv_scores.std()),
@@ -101,21 +142,28 @@ def main() -> None:
         "test_roc_auc": float(roc_auc_score(y_test, probabilities)),
         "confusion_matrix": confusion_matrix(y_test, predictions).tolist(),
         "feature_order": FEATURE_ORDER,
+        "thresholds": thresholds,
     }
 
-    print("\n" + classification_report(y_test, predictions,
-                                       target_names=["no disease", "disease"]))
-
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipeline, MODEL_PATH)
+    joblib.dump(
+        {
+            "pipeline": model,
+            "feature_order": FEATURE_ORDER,
+            "thresholds": thresholds,
+            "model_version": MODEL_VERSION,
+        },
+        MODEL_PATH,
+    )
     METRICS_PATH.write_text(json.dumps(metrics, indent=2))
 
-    print(f"Saved model  -> {MODEL_PATH}")
+    print(f"\nSaved model   -> {MODEL_PATH}")
     print(f"Saved metrics -> {METRICS_PATH}")
     print(
-        "\nNote: this model estimates the presence of heart disease in the "
-        "UCI cohort. It is a screening aid for onboarding, not a diagnosis, "
-        "and the cohort is small, old, and not representative of your users."
+        "\nNote: this model estimates whether cardiovascular disease is "
+        "PRESENT in the source cohort — it is not a forecast, and it is not a "
+        "diagnosis. The cohort is not Myanmar, so its calibration here is "
+        "unknown. Say so wherever the number is shown."
     )
 
 

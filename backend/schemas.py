@@ -78,58 +78,220 @@ class MeResponse(BaseModel):
 
 # ---------- onboarding ----------
 
-class FamilyHistoryEntry(BaseModel):
-    relation: str
-    condition: str
-    age_at_diagnosis: int | None = None
+class PersonalSection(BaseModel):
+    """Category 1. Age and sex are already on the account, so the intake form
+    only collects what signup didn't."""
+
+    height_cm: float = Field(ge=50, le=250)
+    weight_kg: float = Field(ge=20, le=300)
+
+    # Asked here, not taken from the first check-in: baseline risk has to
+    # exist before any check-in can be triaged against it, so waiting for one
+    # would deadlock. Blood pressure is also the strongest single predictor
+    # the model has.
+    systolic_bp: int = Field(ge=60, le=260)
+    diastolic_bp: int = Field(ge=30, le=180)
+
+    @model_validator(mode="after")
+    def systolic_above_diastolic(self):
+        if self.systolic_bp <= self.diastolic_bp:
+            raise ValueError(
+                "The upper blood pressure number must be higher than the lower one."
+            )
+        return self
+
+
+class MedicalHistorySection(BaseModel):
+    """Category 2. Conditions a doctor has diagnosed."""
+
+    hypertension: bool = False
+    diabetes: bool = False
+    ischemic_heart_disease: bool = False
+    heart_failure: bool = False
+    heart_attack: bool = False
+    stroke: bool = False
+    # Tristate: plenty of patients genuinely don't know, and recording that
+    # as "no" would make the rules quietly wrong.
+    valve_disease: Literal["yes", "no", "unknown"] = "unknown"
+    other_cardiovascular_disease: bool = False
+
+
+class FamilyHistorySection(BaseModel):
+    """Category 3. Four flags — the form asks "does anyone in your family",
+    so per-relative detail was never collected."""
+
+    heart_disease: Literal["yes", "no", "unknown"] = "unknown"
+    hypertension: Literal["yes", "no", "unknown"] = "unknown"
+    diabetes: Literal["yes", "no", "unknown"] = "unknown"
+    premature_heart_disease: Literal["yes", "no", "unknown"] = "unknown"
+
+
+class LifestyleSection(BaseModel):
+    """Category 4a. Smoking, exercise, work, alcohol."""
+
+    smokes_now: bool = False
+    # Former smokers keep elevated risk for years, so "not now" is not the
+    # same as "never".
+    smoked_in_past: bool = False
+    physical_activity: Literal["low", "moderate", "high"] = "low"
+    occupation_activity: Literal["sedentary", "light", "moderate", "high"] = "light"
+    drinks_alcohol: bool = False
+
+
+class MedicationSection(BaseModel):
+    """Category 4b. What treatment is already in place.
+
+    The three flags matter more than the free-text list: they tell the rules
+    a condition is being treated, which changes what today's symptoms mean.
+    """
+
+    takes_long_term_medication: bool = False
+    medication_list: str | None = Field(default=None, max_length=1000)
+    blood_pressure_medication: bool = False
+    diabetes_medication: bool = False
+    heart_medication: bool = False
 
 
 class IntakeRequest(BaseModel):
-    age: int = Field(ge=1, le=120)
-    sex: Literal["male", "female"]
-    chest_pain_type: int = Field(ge=0, le=3)
-    resting_bp: int = Field(ge=60, le=260)
-    cholesterol: int = Field(ge=50, le=700)
-    fasting_bs_high: bool
-    resting_ecg: int = Field(ge=0, le=2)
-    max_heart_rate: int = Field(ge=50, le=250)
-    exercise_angina: bool
-    oldpeak: float = Field(ge=0, le=10)
-    st_slope: int = Field(ge=0, le=2)
-    major_vessels: int = Field(ge=0, le=3)
-    thalassemia: int = Field(ge=0, le=3)
-    medications: list[str] | None = None
-    family_history: list[FamilyHistoryEntry] | None = None
+    """The whole baseline, in the four categories the form is built around.
+
+    Nested rather than flat so the frontend can submit one section at a time
+    and so a reader can see at a glance which questions belong together.
+    """
+
+    personal: PersonalSection
+    medical_history: MedicalHistorySection
+    family_history: FamilyHistorySection
+    lifestyle: LifestyleSection
+    medication: MedicationSection
 
 
 class BaselineRiskResponse(BaseModel):
     baseline_risk: Literal["low", "medium", "high"]
     baseline_score: float
+    bmi: float | None = None
     computed_at: datetime
+    # Risk factors the MODEL did not see — family history, prior diagnoses,
+    # medication — surfaced by the rules instead. Shown to the patient so the
+    # number never looks like the whole picture.
+    risk_factors: list[str] = []
     disclaimer: str
 
 
 # ---------- daily check-in ----------
 
 class CheckInRequest(BaseModel):
+    """Symptoms are yes/no; severity comes from breathlessness_trigger.
+
+    "When does it happen" is the NYHA classification in plain language, and a
+    patient can answer it accurately. "How severe, 0 to 3?" invites a guess,
+    and two patients' guesses are not comparable.
+    """
+
     slot: Literal["morning", "night"]
-    chest_pain: int = Field(ge=0, le=3)
-    breathlessness: int = Field(ge=0, le=3)
-    fatigue: int = Field(ge=0, le=3)
-    swelling: int = Field(ge=0, le=3)
-    dizziness: int = Field(ge=0, le=3)
-    medication_taken: bool
+
+    # --- symptoms ---
+    chest_pain: bool = False
+    breathlessness: bool = False
+    breathlessness_trigger: Literal["none", "stairs", "walking", "at_rest"] = "none"
+    dizziness: bool = False
+    fatigue: bool = False
+    palpitations: bool = False
+    swelling: bool = False
+
+    # The most informative question on the form: a stable patient with
+    # ongoing symptoms is not the same as one whose symptoms changed today.
+    worse_than_usual: bool = False
+
+    # --- vitals, optional (not every patient owns a monitor) ---
+    systolic_bp: int | None = Field(default=None, ge=60, le=260)
+    diastolic_bp: int | None = Field(default=None, ge=30, le=180)
+    heart_rate: int | None = Field(default=None, ge=30, le=220)
+    temperature_c: float | None = Field(default=None, ge=30, le=45)
+
+    # --- medication ---
+    medication_taken: bool = True
+    medication_missed: bool = False
+    extra_medication: bool = False
+
+    diet_note: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def trigger_matches_symptom(self):
+        """A trigger without the symptom, or the symptom without a trigger,
+        means the form was filled in inconsistently — and the Prolog rules
+        read both, so letting it through would produce a wrong grade."""
+        if self.breathlessness and self.breathlessness_trigger == "none":
+            raise ValueError(
+                "Tell us when the breathlessness happens: on stairs, when "
+                "walking, or at rest."
+            )
+        if not self.breathlessness and self.breathlessness_trigger != "none":
+            raise ValueError(
+                "You selected when breathlessness happens but not that you "
+                "have it."
+            )
+        return self
 
 
 class ConditionReport(BaseModel):
     checkin_id: str
     created_at: datetime
+    # NYHA functional class, derived from breathlessness_trigger. Null when
+    # the patient reported no breathlessness.
+    nyha_class: int | None = None
     status: Literal["good", "fair", "bad"]
     score: float
     urgency: Literal["routine", "elevated", "emergency"]
     recommendation: str
     fired_rules: list[str]
     disclaimer: str
+
+
+class BaselineRecordResponse(BaseModel):
+    """The patient's own baseline, read back.
+
+    Grouped by the four categories the form was built around rather than
+    returned flat, so the page can show it the way it was asked. A patient
+    re-reading their answers should recognise the shape of the form they
+    filled in.
+    """
+
+    completed_at: datetime | None = None
+    risk_level: str | None = None
+    bmi: float | None = None
+
+    personal: dict[str, Any] | None = None
+    medical_history: dict[str, Any] | None = None
+    family_history: dict[str, Any] | None = None
+    lifestyle: dict[str, Any] | None = None
+    medication: dict[str, Any] | None = None
+
+    risk_factors: list[str] = []
+    disclaimer: str
+
+
+class MyDoctorResponse(BaseModel):
+    """A doctor the patient has an actual relationship with.
+
+    `record_shared` and `appointment_count` are the two things that make this
+    different from browsing the public directory: it answers "who can see my
+    history" and "who am I actually seeing".
+    """
+
+    id: str
+    staff_id: str | None = None
+    full_name: str
+    specialty: str
+    qualifications: str | None = None
+    hospital: str | None = None
+    address: str | None = None
+    bio: str | None = None
+    working_days: list[str] = []
+
+    record_shared: bool = False
+    appointment_count: int = 0
+    next_appointment: datetime | None = None
 
 
 class Reminder(BaseModel):
@@ -145,6 +307,7 @@ class DoctorPublic(BaseModel):
     staff_id: str | None = None
     full_name: str
     specialty: str
+    qualifications: str | None = None
     bio: str | None = None
     hospital: str | None = None
     address: str | None = None
@@ -207,6 +370,8 @@ class ConsentResponse(BaseModel):
 class PatientSummary(BaseModel):
     id: str
     full_name: str
+    age: int | None = None
+    sex: str | None = None
     record_shared: bool
 
 
@@ -221,9 +386,17 @@ class CheckInSummary(BaseModel):
 class PatientRecordResponse(BaseModel):
     patient_id: str
     full_name: str
+    # Demographics live on the patient account, not in the clinical record —
+    # a doctor needs to know who is in front of them. Repeated here so the
+    # record view is self-contained rather than needing a second lookup.
+    age: int | None = None
+    sex: str | None = None
     baseline_risk: str | None = None
+    bmi: float | None = None
     medical_record: dict[str, Any] | None = None
-    family_history: list[FamilyHistoryEntry] = []
+    family_history: dict[str, Any] | None = None
+    lifestyle: dict[str, Any] | None = None
+    medication: dict[str, Any] | None = None
     recent_checkins: list[CheckInSummary] = []
 
 
@@ -232,6 +405,9 @@ class PatientRecordResponse(BaseModel):
 class IssueDoctorRequest(BaseModel):
     full_name: str = Field(min_length=1)
     specialty: str = Field(min_length=1)
+    qualifications: str | None = None
+    hospital: str | None = None
+    address: str | None = None
     bio: str | None = None
 
 
@@ -240,9 +416,28 @@ class DoctorAdminView(BaseModel):
     staff_id: str | None = None
     full_name: str
     specialty: str
+    qualifications: str | None = None
+    hospital: str | None = None
     bio: str | None = None
     activated: bool
     activation_code: str | None = None
+
+
+class AdminAppointmentView(BaseModel):
+    """Operational appointment list for the admin dashboard.
+
+    Names, time and status ONLY. The reason a patient gave and anything from
+    their record stay out: an administrator needs to see that the clinic is
+    running, not why someone is attending. Widening this later should take a
+    deliberate decision, not a convenient one.
+    """
+
+    id: str
+    patient_name: str | None = None
+    doctor_name: str | None = None
+    starts_at: datetime
+    ends_at: datetime
+    status: str
 
 
 class AuditEntry(BaseModel):
@@ -252,20 +447,6 @@ class AuditEntry(BaseModel):
     patient_id: str
     action: str
     occurred_at: datetime
-
-
-class AdminAppointmentView(BaseModel):
-    """Appointment metadata available to administrators.
-
-    This deliberately excludes medical notes and the patient's clinical
-    record. Admins need operational visibility, not clinical-record access.
-    """
-    id: str
-    patient_name: str | None = None
-    doctor_name: str | None = None
-    starts_at: datetime
-    ends_at: datetime
-    status: str
 
 
 # ---------- chatbot ----------

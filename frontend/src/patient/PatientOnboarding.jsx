@@ -1,53 +1,77 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  CHEST_PAIN_TYPE,
+  ACTIVITY_LEVEL,
+  BASELINE_NOTE,
   DISCLAIMER,
-  RESTING_ECG,
-  ST_SLOPE,
-  THALASSEMIA,
+  FAMILY_HISTORY_QUESTIONS,
+  LIFESTYLE_QUESTIONS,
+  MEDICAL_CONDITIONS,
+  MEDICATION_QUESTIONS,
+  OCCUPATION_ACTIVITY,
+  PERSONAL_FIELDS,
+  TRISTATE,
+  VALVE_DISEASE_QUESTION,
 } from "@shared/enums";
 import { api } from "../shared/api/client";
 import Button from "../shared/components/Button";
 import FormInput from "../shared/components/FormInput";
 
 /**
- * Onboarding intake. Runs once and feeds the ML service, which returns the
- * baseline risk that every later check-in is compared against.
+ * Baseline questionnaire — five steps, four clinical categories.
  *
- * Split into three short steps rather than one long form. These are clinical
- * values a patient has to copy off a test result, and a single wall of
- * thirteen inputs is where people give up.
+ *   1  Personal          height, weight, blood pressure
+ *   2  Medical history   conditions a doctor has diagnosed
+ *   3  Family history    four questions, yes/no/don't know
+ *   4  Lifestyle         smoking, exercise, work, alcohol
+ *   5  Medication        what treatment is already in place
+ *
+ * WHY FIVE STEPS AND NOT ONE FORM
+ * Thirty questions on one screen is where people abandon. Each step is one
+ * kind of thinking, so the patient is never switching between recalling a
+ * diagnosis and reading a number off a monitor.
+ *
+ * WHY "DON'T KNOW" IS A BUTTON, NOT A BLANK
+ * Family history and valve disease default to "I don't know" and the patient
+ * must pick. Leaving it blank would be recorded as "no", and someone who
+ * doesn't know whether heart disease runs in their family is in a different
+ * position from someone who knows it doesn't — the first needs the question
+ * raised with a doctor.
  */
 
-const STEPS = ["About you", "From your tests", "Heart activity"];
+const STEPS = [
+  { key: "personal", title: "About you" },
+  { key: "medical", title: "Your medical history" },
+  { key: "family", title: "Your family" },
+  { key: "lifestyle", title: "Daily life" },
+  { key: "medication", title: "Medication" },
+];
 
 const EMPTY = {
-  age: "",
-  sex: "female",
-  chest_pain_type: "3",
-  resting_bp: "",
-  cholesterol: "",
-  fasting_bs_high: false,
-  resting_ecg: "0",
-  max_heart_rate: "",
-  exercise_angina: false,
-  oldpeak: "",
-  st_slope: "1",
-  major_vessels: "0",
-  thalassemia: "0",
+  personal: { height_cm: "", weight_kg: "", systolic_bp: "", diastolic_bp: "" },
+  medical_history: Object.fromEntries(
+    MEDICAL_CONDITIONS.map((c) => [c.key, false]),
+  ),
+  family_history: Object.fromEntries(
+    FAMILY_HISTORY_QUESTIONS.map((q) => [q.key, "unknown"]),
+  ),
+  lifestyle: {
+    smokes_now: false,
+    smoked_in_past: false,
+    drinks_alcohol: false,
+    physical_activity: "low",
+    occupation_activity: "light",
+  },
+  medication: {
+    takes_long_term_medication: false,
+    medication_list: "",
+    blood_pressure_medication: false,
+    diabetes_medication: false,
+    heart_medication: false,
+  },
 };
 
-const REQUIRED_BY_STEP = [
-  ["age"],
-  ["resting_bp", "cholesterol"],
-  ["max_heart_rate", "oldpeak"],
-];
-
-const NUMERIC = [
-  "age", "chest_pain_type", "resting_bp", "cholesterol", "resting_ecg",
-  "max_heart_rate", "oldpeak", "st_slope", "major_vessels", "thalassemia",
-];
+EMPTY.medical_history.valve_disease = "unknown";
 
 export default function PatientOnboarding() {
   const navigate = useNavigate();
@@ -58,38 +82,69 @@ export default function PatientOnboarding() {
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const set = (field) => (value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined }));
+  const setField = (section, key) => (value) => {
+    setForm((prev) => ({ ...prev, [section]: { ...prev[section], [key]: value } }));
+    setErrors((prev) => ({ ...prev, [key]: undefined }));
     setFormError("");
   };
 
-  const validateStep = () => {
-    const missing = {};
-    REQUIRED_BY_STEP[step].forEach((field) => {
-      if (String(form[field]).trim() === "") {
-        missing[field] = "This value is needed to calculate your baseline.";
+  const validatePersonal = () => {
+    const found = {};
+    for (const field of PERSONAL_FIELDS) {
+      const raw = form.personal[field.key];
+      if (String(raw).trim() === "") {
+        found[field.key] = "This is needed to work out your baseline.";
+        continue;
       }
-    });
-    setErrors(missing);
-    return Object.keys(missing).length === 0;
+      const value = Number(raw);
+      if (Number.isNaN(value) || value < field.min || value > field.max) {
+        found[field.key] = `Enter a value between ${field.min} and ${field.max}.`;
+      }
+    }
+
+    const upper = Number(form.personal.systolic_bp);
+    const lower = Number(form.personal.diastolic_bp);
+    if (!found.systolic_bp && !found.diastolic_bp && upper <= lower) {
+      found.systolic_bp = "The upper number must be higher than the lower one.";
+    }
+
+    setErrors(found);
+    return Object.keys(found).length === 0;
   };
 
   const next = () => {
-    if (validateStep()) setStep((s) => s + 1);
+    if (step === 0 && !validatePersonal()) return;
+    setStep((s) => s + 1);
   };
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!validateStep()) return;
+    if (!validatePersonal()) {
+      setStep(0);
+      return;
+    }
 
     setBusy(true);
     try {
-      const payload = { ...form };
-      NUMERIC.forEach((field) => {
-        payload[field] = Number(payload[field]);
-      });
-      setResult(await api.submitIntake(payload));
+      const { valve_disease, ...conditions } = form.medical_history;
+
+      setResult(
+        await api.submitIntake({
+          personal: {
+            height_cm: Number(form.personal.height_cm),
+            weight_kg: Number(form.personal.weight_kg),
+            systolic_bp: Number(form.personal.systolic_bp),
+            diastolic_bp: Number(form.personal.diastolic_bp),
+          },
+          medical_history: { ...conditions, valve_disease },
+          family_history: form.family_history,
+          lifestyle: form.lifestyle,
+          medication: {
+            ...form.medication,
+            medication_list: form.medication.medication_list.trim() || null,
+          },
+        }),
+      );
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -97,30 +152,54 @@ export default function PatientOnboarding() {
     }
   };
 
+  // ============================================================== RESULT
+
   if (result) {
+    const canChange = result.risk_factors.filter((f) => f.startsWith("Can change:"));
+    const cannot = result.risk_factors.filter((f) => f.startsWith("Cannot change:"));
+
     return (
       <section>
-        <p className="eyebrow">Step 3 of 3 · Done</p>
+        <p className="eyebrow">Done</p>
         <h1>Your baseline is set</h1>
 
         <div className="card">
           <p className="eyebrow">Baseline risk</p>
-          <p
-            className="band__value"
-            style={{ color: `var(--${riskColour(result.baseline_risk)})` }}
-          >
+          <p className={`band__value band--${bandClass(result.baseline_risk)}`}
+             style={{ color: `var(--${bandClass(result.baseline_risk)})` }}>
             {result.baseline_risk}
           </p>
-          <p className="readout band__score">
-            {Math.round((result.baseline_score ?? 0) * 100)} / 100
-          </p>
+          {result.bmi && (
+            <p className="band__score">BMI {result.bmi}</p>
+          )}
         </div>
 
-        <p>
-          This runs once. From now on your daily check-in compares each day's
-          symptoms against this baseline — you won't be asked for test results
-          again unless you get new ones.
-        </p>
+        {/* The factors matter more than the band. A patient shown only
+            "High" doesn't know what to do; a patient shown what they can
+            change does. */}
+        {canChange.length > 0 && (
+          <div className="card">
+            <p className="eyebrow">Things you can change</p>
+            <ul className="trail">
+              {canChange.map((f) => (
+                <li key={f}>{f.replace("Can change: ", "")}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {cannot.length > 0 && (
+          <div className="card card--sunk">
+            <p className="eyebrow">Things you can't change</p>
+            <ul className="trail">
+              {cannot.map((f) => (
+                <li key={f}>{f.replace("Cannot change: ", "")}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <p className="disclaimer">{BASELINE_NOTE}</p>
         <p className="disclaimer">{result.disclaimer ?? DISCLAIMER}</p>
 
         <Button block onClick={() => navigate("/patient/check-in")}>
@@ -130,145 +209,154 @@ export default function PatientOnboarding() {
     );
   }
 
+  // =============================================================== FORM
+
+  const current = STEPS[step];
+  const isLast = step === STEPS.length - 1;
+
   return (
     <section>
       <p className="eyebrow">
-        Step {step + 1} of {STEPS.length} · {STEPS[step]}
+        Step {step + 1} of {STEPS.length} · {current.title}
       </p>
-      <h1>Tell us about your heart health</h1>
-
-      {step === 0 && (
-        <p className="lede">
-          A few basics first. Nothing here is shared with any doctor until you
-          choose to share it.
-        </p>
-      )}
-      {step === 1 && (
-        <p className="lede">
-          These come from your most recent blood test and blood pressure
-          reading. If you don't have them, ask your doctor before continuing.
-        </p>
-      )}
-      {step === 2 && (
-        <p className="lede">
-          These come from an ECG or stress test. Leave the defaults if you
-          haven't had one.
-        </p>
-      )}
+      <h1>Your baseline</h1>
 
       <form onSubmit={submit} noValidate>
-        {step === 0 && (
+        {current.key === "personal" && (
           <>
-            <FormInput
-              label="Age"
-              type="number"
-              inputMode="numeric"
-              min="1"
-              max="120"
-              value={form.age}
-              onChange={set("age")}
-              error={errors.age}
-            />
-            <FormInput
-              label="Sex"
-              options={[
-                { value: "female", label: "Female" },
-                { value: "male", label: "Male" },
-              ]}
-              value={form.sex}
-              onChange={set("sex")}
-            />
-            <FormInput
-              label="Chest pain you usually get"
-              options={CHEST_PAIN_TYPE}
-              value={form.chest_pain_type}
-              onChange={set("chest_pain_type")}
+            <p className="lede">
+              These are measured, not remembered. If you don't have a blood
+              pressure reading from the last few weeks, take one before
+              continuing — it's the single most important number here.
+            </p>
+            {PERSONAL_FIELDS.map((field) => (
+              <FormInput
+                key={field.key}
+                label={field.label}
+                hint={field.hint}
+                type="number"
+                inputMode="decimal"
+                step={field.key === "weight_kg" ? "0.1" : "1"}
+                min={field.min}
+                max={field.max}
+                value={form.personal[field.key]}
+                onChange={setField("personal", field.key)}
+                error={errors[field.key]}
+              />
+            ))}
+          </>
+        )}
+
+        {current.key === "medical" && (
+          <>
+            <p className="lede">
+              Tick anything a doctor has told you that you have. Leave the rest
+              alone.
+            </p>
+            {MEDICAL_CONDITIONS.map((condition) => (
+              <FormInput
+                key={condition.key}
+                type="checkbox"
+                label={condition.label}
+                value={form.medical_history[condition.key]}
+                onChange={setField("medical_history", condition.key)}
+              />
+            ))}
+
+            <Choice
+              legend={VALVE_DISEASE_QUESTION.label}
+              options={TRISTATE}
+              value={form.medical_history.valve_disease}
+              onChange={setField("medical_history", "valve_disease")}
             />
           </>
         )}
 
-        {step === 1 && (
+        {current.key === "family" && (
           <>
-            <FormInput
-              label="Resting blood pressure"
-              hint="The upper number, in mm Hg."
-              type="number"
-              inputMode="numeric"
-              value={form.resting_bp}
-              onChange={set("resting_bp")}
-              error={errors.resting_bp}
+            <p className="lede">
+              "I don't know" is a real answer — please use it rather than
+              guessing. Guessing "no" hides something your doctor may want to
+              ask about.
+            </p>
+            {FAMILY_HISTORY_QUESTIONS.map((question) => (
+              <Choice
+                key={question.key}
+                legend={question.label}
+                options={TRISTATE}
+                value={form.family_history[question.key]}
+                onChange={setField("family_history", question.key)}
+              />
+            ))}
+          </>
+        )}
+
+        {current.key === "lifestyle" && (
+          <>
+            {LIFESTYLE_QUESTIONS.map((question) => (
+              <FormInput
+                key={question.key}
+                type="checkbox"
+                label={question.label}
+                value={form.lifestyle[question.key]}
+                onChange={setField("lifestyle", question.key)}
+              />
+            ))}
+
+            <Choice
+              legend="How often do you exercise?"
+              options={ACTIVITY_LEVEL}
+              value={form.lifestyle.physical_activity}
+              onChange={setField("lifestyle", "physical_activity")}
             />
-            <FormInput
-              label="Cholesterol"
-              hint="Total cholesterol in mg/dl."
-              type="number"
-              inputMode="numeric"
-              value={form.cholesterol}
-              onChange={set("cholesterol")}
-              error={errors.cholesterol}
-            />
-            <FormInput
-              label="My fasting blood sugar is above 120 mg/dl"
-              type="checkbox"
-              value={form.fasting_bs_high}
-              onChange={set("fasting_bs_high")}
-            />
-            <FormInput
-              label="Resting ECG result"
-              options={RESTING_ECG}
-              value={form.resting_ecg}
-              onChange={set("resting_ecg")}
+
+            {/* Separate from exercise on purpose: a labourer who never
+                exercises is not sedentary. */}
+            <Choice
+              legend="How physical is your daily work?"
+              options={OCCUPATION_ACTIVITY}
+              value={form.lifestyle.occupation_activity}
+              onChange={setField("lifestyle", "occupation_activity")}
             />
           </>
         )}
 
-        {step === 2 && (
+        {current.key === "medication" && (
           <>
-            <FormInput
-              label="Highest heart rate recorded"
-              hint="From a stress test, in beats per minute."
-              type="number"
-              inputMode="numeric"
-              value={form.max_heart_rate}
-              onChange={set("max_heart_rate")}
-              error={errors.max_heart_rate}
-            />
-            <FormInput
-              label="ST depression"
-              hint="Listed as 'oldpeak' on a stress test report (0–10)."
-              type="number"
-              step="0.1"
-              min="0"
-              max="10"
-              inputMode="decimal"
-              value={form.oldpeak}
-              onChange={set("oldpeak")}
-              error={errors.oldpeak}
-            />
-            <FormInput
-              label="ST slope"
-              options={ST_SLOPE}
-              value={form.st_slope}
-              onChange={set("st_slope")}
-            />
-            <FormInput
-              label="Major vessels seen on scan"
-              options={[0, 1, 2, 3].map((n) => ({ value: n, label: String(n) }))}
-              value={form.major_vessels}
-              onChange={set("major_vessels")}
-            />
-            <FormInput
-              label="Thalassemia test result"
-              options={THALASSEMIA}
-              value={form.thalassemia}
-              onChange={set("thalassemia")}
-            />
-            <FormInput
-              label="Exercise brings on my chest pain"
-              type="checkbox"
-              value={form.exercise_angina}
-              onChange={set("exercise_angina")}
-            />
+            <p className="lede">
+              Knowing what you already take changes how we read your daily
+              symptoms.
+            </p>
+            {MEDICATION_QUESTIONS.map((question) => (
+              <FormInput
+                key={question.key}
+                type="checkbox"
+                label={question.label}
+                value={form.medication[question.key]}
+                onChange={setField("medication", question.key)}
+              />
+            ))}
+
+            <div className="field">
+              <label className="field__label" htmlFor="med-list">
+                Which medications? (optional)
+              </label>
+              <span className="field__hint">
+                Names are enough. Your doctor sees this once you share your
+                record.
+              </span>
+              <textarea
+                id="med-list"
+                className="field__control"
+                rows={3}
+                maxLength={1000}
+                value={form.medication.medication_list}
+                onChange={(e) =>
+                  setField("medication", "medication_list")(e.target.value)
+                }
+                style={{ resize: "vertical", minHeight: "5rem" }}
+              />
+            </div>
           </>
         )}
 
@@ -284,12 +372,12 @@ export default function PatientOnboarding() {
               Back
             </Button>
           )}
-          {step < STEPS.length - 1 ? (
-            <Button onClick={next}>Continue</Button>
-          ) : (
-            <Button type="submit" busy={busy} busyLabel="Calculating…">
-              Calculate my baseline
+          {isLast ? (
+            <Button type="submit" busy={busy} busyLabel="Working it out…">
+              Finish and see my baseline
             </Button>
+          ) : (
+            <Button onClick={next}>Continue</Button>
           )}
         </div>
       </form>
@@ -297,7 +385,32 @@ export default function PatientOnboarding() {
   );
 }
 
-function riskColour(level) {
+/** A labelled group of mutually exclusive options, reusing the scale styles. */
+function Choice({ legend, options, value, onChange }) {
+  return (
+    <fieldset className="scale">
+      <legend>{legend}</legend>
+      <div
+        className="scale__options"
+        style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}
+      >
+        {options.map((option) => (
+          <label className="scale__option" key={String(option.value)}>
+            <input
+              type="radio"
+              name={legend}
+              checked={value === option.value}
+              onChange={() => onChange(option.value)}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function bandClass(level) {
   if (level === "high") return "bad";
   if (level === "medium") return "fair";
   return "good";
